@@ -8,7 +8,8 @@ get_atmo_dep(
   catchment_boundary_path,
   t_ext = "year",
   start_year = 1990,
-  end_year = 2023
+  end_year = 2023,
+  netcdf_source = NULL
 )
 }
 \arguments{
@@ -23,6 +24,14 @@ extraction. Default \code{start_year = 1990}.}
 
 \item{end_year}{Integer representing the ending year for data extraction.
 Default \code{end_year = 2023}.}
+
+\item{netcdf_source}{A function, character template, or character vector that
+resolves one EMEP NetCDF file for every requested year. A function receives
+arguments \code{year} and \code{timestep}. A template must contain
+\code{\{year\}} and may contain \code{\{timestep\}}. A vector must have one
+entry per year or be named by year. Local file paths and OPeNDAP URLs are
+supported. EMEP changes its reporting-cycle URLs, so no catchment-independent
+URL is assumed.}
 }
 \value{
 A dataframe with columns "DATE", "NH4_RF", "NO3_RF", "NH4_DRY", and
@@ -42,8 +51,11 @@ a specified catchment.
   # Specify the path to the basin boundary shape file
   catchment_boundary_path <- system.file("extdata", "GIS/basin.shp", package = "SWATprepR")
   
-  # Get atmospheric deposition data for the catchment
-  df <- get_atmo_dep(catchment_boundary_path)
+  # Resolve one current EMEP file for every requested year
+  source <- function(year, timestep) {
+    sprintf("https://example.org/EMEP_%s_%d.nc", timestep, year)
+  }
+  df <- get_atmo_dep(catchment_boundary_path, netcdf_source = source)
   
   # Plot results
   ggplot(pivot_longer(df, !DATE, names_to = "par", values_to = "values"), 

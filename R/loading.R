@@ -487,6 +487,12 @@ load_swat_weather <- function(input_folder){
 #'  extraction. Default \code{start_year = 1990}.
 #' @param end_year Integer representing the ending year for data extraction. 
 #' Default \code{end_year = 2023}.
+#' @param netcdf_source A function, character template, or character vector that
+#'   resolves one EMEP NetCDF file for every requested year. A function receives
+#'   arguments `year` and `timestep`. A template must contain `{year}` and may
+#'   contain `{timestep}`. A vector must have one entry per year or be named by
+#'   year. Local file paths and OPeNDAP URLs are supported. EMEP changes its
+#'   reporting-cycle URLs, so no catchment-independent URL is assumed.
 #' @importFrom sf st_transform st_read st_bbox st_crs
 #' @importFrom dplyr bind_rows
 #' @return A dataframe with columns "DATE", "NH4_RF", "NO3_RF", "NH4_DRY", and 
@@ -503,7 +509,10 @@ load_swat_weather <- function(input_folder){
 #'   catchment_boundary_path <- system.file("extdata", "GIS/basin.shp", package = "SWATprepR")
 #'   
 #'   # Get atmospheric deposition data for the catchment
-#'   df <- get_atmo_dep(catchment_boundary_path)
+#'   source <- function(year, timestep) {
+#'     sprintf("https://example.org/EMEP_%s_%d.nc", timestep, year)
+#'   }
+#'   df <- get_atmo_dep(catchment_boundary_path, netcdf_source = source)
 #'   
 #'   # Plot results
 #'   ggplot(pivot_longer(df, !DATE, names_to = "par", values_to = "values"), 
@@ -518,13 +527,47 @@ load_swat_weather <- function(input_folder){
 #' @seealso 
 #' Please read about SWAT+ atmospheric input data on \url{https://swatplus.gitbook.io/io-docs/introduction/climate/atmo.cli}.
 
-get_atmo_dep <- function(catchment_boundary_path, t_ext = "year", start_year = 1990, end_year = 2023){
+resolve_atmo_dep_sources <- function(netcdf_source, years, timestep) {
+  if (is.null(netcdf_source)) {
+    stop("EMEP reporting-cycle URLs are not stable. Supply 'netcdf_source' as ",
+         "a function, a template containing {year}, or one path/URL per year. ",
+         "See https://www.emep.int/mscw/mscw_moddata.html for current data.")
+  }
+  if (is.function(netcdf_source)) {
+    sources <- vapply(years, function(year) netcdf_source(year, timestep), character(1))
+  } else if (is.character(netcdf_source) && length(netcdf_source) == 1L &&
+             grepl('{year}', netcdf_source, fixed = TRUE)) {
+    sources <- vapply(years, function(year) {
+      source <- gsub('{year}', year, netcdf_source, fixed = TRUE)
+      gsub('{timestep}', timestep, source, fixed = TRUE)
+    }, character(1))
+  } else if (is.character(netcdf_source) && !is.null(names(netcdf_source)) &&
+             all(as.character(years) %in% names(netcdf_source))) {
+    sources <- unname(netcdf_source[as.character(years)])
+  } else if (is.character(netcdf_source) && length(netcdf_source) == length(years)) {
+    sources <- unname(netcdf_source)
+  } else {
+    stop("'netcdf_source' must resolve exactly one NetCDF path or URL per requested year.")
+  }
+  if (anyNA(sources) || any(!nzchar(sources))) {
+    stop("'netcdf_source' returned a missing or empty path/URL.")
+  }
+  sources
+}
+
+get_atmo_dep <- function(catchment_boundary_path, t_ext = "year", start_year = 1990,
+                         end_year = 2023, netcdf_source = NULL){
   ## Ckeck if RNetCDF is installed
   if(!requireNamespace("RNetCDF", quietly = TRUE)){
     stop("RNetCDF package is not installed. Please install it before using this function.")
   }
-  ##Part url link to emep data (more info found here https://www.emep.int/mscw/mscw_moddata.html)
-  url_prt <- "https://thredds.met.no/thredds/dodsC/data/EMEP/2024_Reporting/EMEP01_rv5.3_"
+  if (!t_ext %in% c('year', 'month')) stop("'t_ext' must be 'year' or 'month'.")
+  if (length(start_year) != 1L || length(end_year) != 1L ||
+      is.na(start_year) || is.na(end_year) || start_year > end_year) {
+    stop("Provide one valid start_year that is not later than end_year.")
+  }
+  years <- seq.int(as.integer(start_year), as.integer(end_year))
+  sources <- resolve_atmo_dep_sources(netcdf_source, years, t_ext)
   ##Getting borders of the catchment
   basin <- st_read(catchment_boundary_path, quiet = TRUE)
   if(is.na(st_crs(basin))){
@@ -539,22 +582,18 @@ get_atmo_dep <- function(catchment_boundary_path, t_ext = "year", start_year = 1
                    NH4_RF = numeric(), NO3_RF = numeric(), 
                    NH4_DRY = numeric(), NO3_DRY = numeric())
   ##Loop to extract data
-  for(u in seq(start_year, end_year)){
+  for(source_idx in seq_along(years)){
+    u <- years[source_idx]
     print(paste("Working on year", u))
-    if(!u %in% c(2022, 2023)){
-      uu <- "_rep2024.nc"
-    } else {
-      uu <- ".nc"
-    }
-    ##Assembling URL for each year
-    url <- paste0(url_prt, t_ext, ".", u, "met_", ifelse(u %in% c(2022, 2023), 2022, u), "emis", uu)
+    url <- sources[source_idx]
     ##Opening file and getting indexes for data.
     # Attempt to open the NetCDF file
     r <- try(RNetCDF::open.nc(url), silent = TRUE)
     
     # Check if an error occurred
     if (inherits(r, "try-error")) {
-      stop(paste("Error: Unable to open the NetCDF file:", url, "Please check, if internet connection is working and the file is available on EMEP server."))
+      stop("Unable to open the atmospheric-deposition NetCDF source for ", u,
+           ": ", url, ". Check the path/URL and the current EMEP reporting catalog.")
     }
     lon <- rvar_get(r, "lon")
     lat <- rvar_get(r, "lat")
@@ -604,11 +643,12 @@ get_atmo_dep <- function(catchment_boundary_path, t_ext = "year", start_year = 1
     } else {
       stop("Wrong t_ext!!! Should be one of these strings: 'year' or 'month'.")
     }
+    RNetCDF::close.nc(r)
     print(paste("Finished data extraction for year", u))
   }
   ##Adding DATE
   if(t_ext != "day"){
-    df$DATE <- as.Date(paste(df$YR, df$MO, df$DAY), format="%Y %m %j")
+    df$DATE <- as.Date(paste(df$YR, df$MO, df$DAY), format="%Y %m %d")
   } else {
     df$DATE <- as.Date(paste(df$YR, df$DAY), format="%Y %j")
   }

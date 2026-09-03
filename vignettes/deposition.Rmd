@@ -37,13 +37,17 @@ These parameters can be used to prepare following SWAT+ parameters required for 
 - *NH4_DRY* - ammonia nitrogen dry deposition ($kg/ha/yr$);
 - *NO3_DRY* - nitrate nitrogen dry deposition ($kg/ha/yr$). 
 
-EMEP provides access to yearly, monthly, daily and hourly data. Data for a selected catchment with required time step could be extracted directly from [EMEP website](https://www.emep.int/mscw/mscw_moddata.html) with [get_atmo_dep](../reference/get_atmo_dep.html) function. Function requires just path to catchment boundary shape file and internet connection. Depending of the data time step selected (yearly or monthly), function will need more or less time to run (less with "year" selected, more with "month"). More information about the inclusion of atmospheric deposition data in SWAT+ modeling is presented in the section 3.10 of [SWAT+ modelling protocol](https://doi.org/10.5281/zenodo.7463395).
+EMEP provides yearly, monthly, daily and hourly data. Reporting-cycle directories and file names change, so [get_atmo_dep](../reference/get_atmo_dep.html) requires an explicit local or OPeNDAP NetCDF source for each year. Obtain the current sources from the [EMEP model-data page](https://www.emep.int/mscw/mscw_moddata.html). Depending on the selected time step, extraction can take some time. More information about atmospheric deposition in SWAT+ is presented in section 3.10 of the [SWAT+ modelling protocol](https://doi.org/10.5281/zenodo.7463395).
 
 ```{r atmo_dep, eval=FALSE, message = FALSE, warning = FALSE}
 library(SWATprepR)
 library(tidyverse)
 basin_path <- system.file("extdata", "GIS/basin.shp", package = "SWATprepR")
-df <- get_atmo_dep(basin_path, t_ext = 'month')
+netcdf_source <- function(year, timestep) {
+  file.path('path/to/emep', sprintf('EMEP_%s_%d.nc', timestep, year))
+}
+df <- get_atmo_dep(basin_path, t_ext = 'month',
+                   netcdf_source = netcdf_source)
 ##Plot results
 ggplot(pivot_longer(df, !DATE, names_to = "par", values_to = "values"), aes(x = DATE, y = values))+ 
   geom_line()+ 

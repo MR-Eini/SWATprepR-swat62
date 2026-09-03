@@ -1424,7 +1424,26 @@ add_weather <- function(db_path, meteo_lst, wgn_lst, fill_missing = TRUE){
 #' @author Svajunas Plunge (svajunas.plunge@gmail.com)
 #' @author Moritz Shore (moritzshore@gmail.com)
 
+validate_atmo_dep_data <- function(df) {
+  required <- c('DATE', 'NH4_RF', 'NO3_RF', 'NH4_DRY', 'NO3_DRY')
+  if (!is.data.frame(df) || !all(required %in% names(df))) {
+    stop("Atmospheric deposition data must contain: ", paste(required, collapse = ', '))
+  }
+  df <- df[required]
+  df$DATE <- as.Date(df$DATE)
+  for (field in setdiff(required, 'DATE')) {
+    df[[field]] <- suppressWarnings(as.numeric(df[[field]]))
+  }
+  if (anyNA(df) || any(!is.finite(as.matrix(df[setdiff(required, 'DATE')]))) ||
+      any(as.matrix(df[setdiff(required, 'DATE')]) < 0)) {
+    stop('Atmospheric deposition dates and values must be non-missing, finite, and non-negative.')
+  }
+  if (anyDuplicated(df$DATE)) stop('Atmospheric deposition dates must be unique.')
+  df[order(df$DATE), , drop = FALSE]
+}
+
 add_atmo_dep <- function(df, write_path, t_ext = "year") {
+  df <- validate_atmo_dep_data(df)
   ## Cleaning up the project folder
   files_to_remove <- c(paste0(write_path, "/", "atmodep.cli"), paste0(write_path, "/weather-sta.cli.bak"), paste0(write_path, "/codes.bsn.bak"))
   for(f in files_to_remove) if (file.exists(f)) file.remove(f)
