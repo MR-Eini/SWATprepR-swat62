@@ -203,12 +203,12 @@ load_climate <- function(f_path, f_lst = list("PCP" = "prec-1", "SLR" = "solarRa
 read_tbl <- function(tbl_name, proj_path, row_data_start = 3, row_col_names = 2) {
   tbl_path <- paste(proj_path, tbl_name, sep = '/')
   ##Reading column names
-  col_names <- vroom_lines(tbl_path, skip = row_col_names - 1, n_max = 1) %>%
+  col_names <- readr::read_lines(tbl_path, skip = row_col_names - 1, n_max = 1, lazy = FALSE) %>%
     str_trim(.) %>%
     str_split(., '[:space:]+') %>%
     unlist()
   ##Reading file body into list
-  tbl <- vroom_lines(tbl_path, skip = row_data_start - 1) %>%
+  tbl <- readr::read_lines(tbl_path, skip = row_data_start - 1, lazy = FALSE) %>%
     str_trim(.) %>%
     str_split(., '\t[:space:]+|[:space:]+')
   ##Checking if all columns have names

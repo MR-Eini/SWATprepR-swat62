@@ -1,7 +1,7 @@
 Package: SWATprepR
 Type: Package
 Title: SWAT+ input data preparation tool
-Version: 1.0.13
+Version: 1.0.14
 Date: 2025-11-13
 Author: c(person("Svajunas", "Plunge",
              email = "svajunas.plunge@gmail.com",
@@ -10,11 +10,12 @@ Author: c(person("Svajunas", "Plunge",
 Maintainer: Svajunas Plunge <svajunas.plunge@gmail.com>
 Description: Tool to help with SWAT+ model users with input data preparation. 
 License: MIT + file LICENSE
-URL: https://github.com/biopsichas/SWATprepR
-BugReports: https://github.com/biopsichas/SWATprepR/issues
+URL: https://github.com/MR-Eini/SWATprepR-swat62
+BugReports: https://github.com/MR-Eini/SWATprepR-swat62/issues
 Depends:
     R (>= 4.2.0)
 Imports:
+    SWATreadR (>= 0.1.0.9013),
     DBI,
     dplyr,
     ggplot2,

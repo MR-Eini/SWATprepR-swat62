@@ -3,7 +3,7 @@
 
 #' Function to get data to be used in the interpolation
 #'
-#' @param meteo_lst nested list with dataframes. 
+#' @param meteo_lst nested list with dataframes.
 #' Nested structure meteo_lst -> data -> Station ID -> Parameter -> Dataframe (DATE, PARAMETER).
 #' @param par is weather variable to extract (i.e. "PCP", "SLR", etc)
 #' @importFrom dplyr left_join select everything %>% mutate across na_if
@@ -12,7 +12,7 @@
 #' @importFrom stringr str_to_title
 #' @return SpatialPointsDataFrame with columns as days and rows as stations.
 #' @keywords internal
-#' 
+#'
 #' @examples
 #' ##get_data_to_interpolate (meteo_lst, "PCP")
 
@@ -26,22 +26,22 @@ get_data_to_interpolate <- function(meteo_lst, par){
   for (n in names(meteo_lst)){
     if(par %in% names(meteo_lst[[n]])){
       df <- left_join(df, meteo_lst[[n]][[par]] %>%
-                        mutate(DATE = as.POSIXct(DATE)) %>% 
+                        mutate(DATE = as.POSIXct(DATE)) %>%
                         `colnames<-`(c("DATE", n)), by = "DATE")
     }
   }
   ## ID to names of stations
-  id_station <- stations %>% 
-    st_set_geometry(NULL) %>% 
-    mutate(Name = paste0(str_to_title(Name), " (", Source, ")")) %>% 
+  id_station <- stations %>%
+    st_set_geometry(NULL) %>%
+    mutate(Name = paste0(str_to_title(Name), " (", Source, ")")) %>%
     select(ID, Name, Lat, Long)
-  
+
   ## Replacing -99 with NA
   df <- mutate(df, across(-all_of("DATE"), ~na_if(., -99)))
   ## Transforming extracted data
-  df <- as.data.frame(t(df[-1])) %>% 
-    rownames_to_column(var = "ID") %>% 
-    left_join(id_station[-2], by = "ID") %>% 
+  df <- as.data.frame(t(df[-1])) %>%
+    rownames_to_column(var = "ID") %>%
+    left_join(id_station[-2], by = "ID") %>%
     select(Lat, Long, everything(), -ID)
   ## Converting df data to sp
   sp::coordinates(df) <-  ~Long + Lat
@@ -52,13 +52,13 @@ get_data_to_interpolate <- function(meteo_lst, par){
 
 #' Main interpolation function
 #'
-#' @param meteo_lst nested list with dataframes. 
+#' @param meteo_lst nested list with dataframes.
 #' Nested structure meteo_lst -> data -> Station ID -> Parameter -> Dataframe (DATE, PARAMETER).
-#' @param grd sp SpatialGrid grid for the interpolation. 
+#' @param grd sp SpatialGrid grid for the interpolation.
 #' @param par character representing weather variable to extract (i.e. "PCP", "SLR", etc).
 #' @param shp  sf dataframe for defining basin boundary shape.
 #' @param dem_data_path path to DEM raster data in same projection as weather station.
-#' @param idw_exponent numeric value for exponent parameter to be used in interpolation. 
+#' @param idw_exponent numeric value for exponent parameter to be used in interpolation.
 #' (optional, default value is 2).
 #' @importFrom methods as
 #' @importFrom sf st_crs st_transform read_sf
@@ -77,10 +77,10 @@ get_data_to_interpolate <- function(meteo_lst, par){
 get_interpolated_data <- function(meteo_lst, grd, par, shp, dem_data_path, idw_exponent){
   ## Preparing data for interpolation and grid
   df <- get_data_to_interpolate(meteo_lst, par)
-  
+
   ## Loading data
   DEM <- raster::raster(dem_data_path)
-  
+
   ## Defining coordinate system
   m_proj <- st_crs(meteo_lst$stations)$input
   if (m_proj != st_crs(shp)$input){
@@ -106,38 +106,38 @@ get_interpolated_data <- function(meteo_lst, grd, par, shp, dem_data_path, idw_e
   return(meteo_pts)
 }
 
-#' Interpolate Weather Data 
+#' Interpolate Weather Data
 #'
-#' This function interpolates weather data for a SWAT model and saves results 
+#' This function interpolates weather data for a SWAT model and saves results
 #' into nested list format. The function uses Inverse Distance Weighting (IDW)
 #' interpolation method to fill gaps in weather data.
-#' This function uses `sp`, `gstat` and `raster` packages for spatial operations. Please 
+#' This function uses `sp`, `gstat` and `raster` packages for spatial operations. Please
 #' make sure that these packages are installed before using this function.
 #'
-#' @param meteo_lst A nested list with dataframes. 
-#'   Nested structure: \code{meteo_lst -> data -> Station ID -> Parameter -> 
-#'   Dataframe (DATE, PARAMETER)}, 
-#'   \code{meteo_lst -> stations -> Dataframe (ID, Name, Elevation, Source, 
+#' @param meteo_lst A nested list with dataframes.
+#'   Nested structure: \code{meteo_lst -> data -> Station ID -> Parameter ->
+#'   Dataframe (DATE, PARAMETER)},
+#'   \code{meteo_lst -> stations -> Dataframe (ID, Name, Elevation, Source,
 #'   geometry, Long, Lat)}. \cr\cr
-#'   meteo_lst can be created using \code{\link{load_template}} function using 
+#'   meteo_lst can be created using \code{\link{load_template}} function using
 #'   'xlsx' template file or it could to be created with \code{\link{load_swat_weather}}
 #'   function loading information from SWAT+ model setup weather files.
 #' @param catchment_boundary_path Character, path to the basin boundary shape file.
-#' @param dem_data_path Character, path to DEM raster data in the same projection 
+#' @param dem_data_path Character, path to DEM raster data in the same projection
 #' as the weather station.
-#' @param grid_spacing Numeric, value for the distance between grid points. 
+#' @param grid_spacing Numeric, value for the distance between grid points.
 #'   Units of the coordinate system should be used.
-#' @param p_vector (optional) Character vector representing weather variables to 
-#' interpolate. Default is all variables selected 
+#' @param p_vector (optional) Character vector representing weather variables to
+#' interpolate. Default is all variables selected
 #' \code{p_vector = c("PCP", "SLR", "RELHUM", "WNDSPD", "TMP_MAX", "TMP_MIN")}.
-#' @param idw_exponent (optional) Numeric value for the exponent parameter to 
+#' @param idw_exponent (optional) Numeric value for the exponent parameter to
 #' be used in interpolation. Default \code{idw_exponent = 2}.
 #' @importFrom sf st_zm st_bbox st_read st_crs st_transform
 #' @return A nested list with interpolation results.
-#'    A nested list with dataframes. 
-#'   Nested structure: \code{meteo_lst -> data -> Station ID -> Parameter -> 
-#'   Dataframe (DATE, PARAMETER)}, 
-#'   \code{meteo_lst -> stations -> Dataframe (ID, Name, Elevation, Source, 
+#'    A nested list with dataframes.
+#'   Nested structure: \code{meteo_lst -> data -> Station ID -> Parameter ->
+#'   Dataframe (DATE, PARAMETER)},
+#'   \code{meteo_lst -> stations -> Dataframe (ID, Name, Elevation, Source,
 #'   geometry, Long, Lat)}.
 #' @export
 #' @examples
@@ -150,12 +150,12 @@ get_interpolated_data <- function(meteo_lst, grd, par, shp, dem_data_path, idw_e
 #'   # Load weather data template
 #'   met_lst <- load_template(temp_path, 3035)
 #'
-#'   # Interpolate 
-#'   met_lst_int <- interpolate(met_lst, basin_path, DEM_path, 2000) 
+#'   # Interpolate
+#'   met_lst_int <- interpolate(met_lst, basin_path, DEM_path, 2000)
 #' }
 #' @keywords gap-filling
 
-interpolate <- function(meteo_lst, catchment_boundary_path, dem_data_path, grid_spacing, 
+interpolate <- function(meteo_lst, catchment_boundary_path, dem_data_path, grid_spacing,
                         p_vector = c("PCP", "SLR", "RELHUM", "WNDSPD", "TMP_MAX", "TMP_MIN"), idw_exponent = 2){
   ## Require sp library
   if (!requireNamespace("sp", quietly = TRUE)) {
@@ -163,7 +163,7 @@ interpolate <- function(meteo_lst, catchment_boundary_path, dem_data_path, grid_
   }
   ##List to save interpolation results for examining
   results <- list()
-  p_lst <- list("PCP" = "pcp", "SLR" = "solar", "RELHUM" = "rh", "TMP_MAX" = "tmp", 
+  p_lst <- list("PCP" = "pcp", "SLR" = "solar", "RELHUM" = "rh", "TMP_MAX" = "tmp",
                 "TMP_MIN" = "tmp", "WNDSPD" = "wind")
   ##Reading and defining coordinate system
   shp <- st_read(catchment_boundary_path, quiet = TRUE)
@@ -188,9 +188,9 @@ interpolate <- function(meteo_lst, catchment_boundary_path, dem_data_path, grid_
       results[[p]] <- get_interpolated_data(meteo_lst, grd, p, shp, dem_data_path, idw_exponent)
     }
   }
-  cat("\014") 
+  cat("\014")
   print("Interpolation is finished.")
-  ##Converting into list of lists 
+  ##Converting into list of lists
   start_date <- get_dates(meteo_lst)$min_date
   end_date <- get_dates(meteo_lst)$max_date
   meteo_lst_int <- transform_to_list(results, start_date, end_date)
@@ -202,46 +202,46 @@ interpolate <- function(meteo_lst, catchment_boundary_path, dem_data_path, grid_
 
 #' Generate Weather Generator (WGN) Data for SWAT+ Model
 #'
-#' This function generates weather generator (WGN) data for a SWAT+ model 
+#' This function generates weather generator (WGN) data for a SWAT+ model
 #' based on meteorological data.
 #'
-#' @param meteo_lst Nested list with dataframes. 
-#'   Nested structure: \code{meteo_lst -> data -> Station ID -> Parameter -> 
-#'   Dataframe (DATE, PARAMETER)}, 
-#'   \code{meteo_lst -> stations -> Dataframe (ID, Name, Elevation, Source, 
+#' @param meteo_lst Nested list with dataframes.
+#'   Nested structure: \code{meteo_lst -> data -> Station ID -> Parameter ->
+#'   Dataframe (DATE, PARAMETER)},
+#'   \code{meteo_lst -> stations -> Dataframe (ID, Name, Elevation, Source,
 #'   geometry, Long, Lat)}. \cr\cr
-#'   meteo_lst can be created using \code{\link{load_template}} function using 
+#'   meteo_lst can be created using \code{\link{load_template}} function using
 #'   'xlsx' template file or it could to be created with \code{\link{load_swat_weather}}
 #'   function loading information from SWAT+ model setup weather files.
-#' @param TMP_MAX (optional) Dataframe with two columns: DATE : POSIXct, TMP_MAX : num. 
-#' This parameter refers to data, which should be used instead if TMP_MAX variable 
-#' is missing for a station. Default \code{TMP_MAX = NULL}, data of the closest 
+#' @param TMP_MAX (optional) Dataframe with two columns: DATE : POSIXct, TMP_MAX : num.
+#' This parameter refers to data, which should be used instead if TMP_MAX variable
+#' is missing for a station. Default \code{TMP_MAX = NULL}, data of the closest
 #' station with data will be used. Units: Celsius.
-#' @param TMP_MIN (optional) Dataframe with two columns: DATE : POSIXct, TMP_MIN : num. 
-#'   This parameter refers to data, which should be used instead if TMP_MIN variable 
-#'   is missing for a station. Default \code{TMP_MIN = NULL}, indicating that data of the closest 
+#' @param TMP_MIN (optional) Dataframe with two columns: DATE : POSIXct, TMP_MIN : num.
+#'   This parameter refers to data, which should be used instead if TMP_MIN variable
+#'   is missing for a station. Default \code{TMP_MIN = NULL}, indicating that data of the closest
 #'   station with data will be used. Units: Celsius.
-#' @param PCP (optional) Dataframe with two columns: DATE : POSIXct, PCP : num. 
-#'   This parameter refers to data, which should be used instead if PCP variable 
-#'   is missing for a station. Default \code{PCP = NULL}, indicating that data of the closest 
+#' @param PCP (optional) Dataframe with two columns: DATE : POSIXct, PCP : num.
+#'   This parameter refers to data, which should be used instead if PCP variable
+#'   is missing for a station. Default \code{PCP = NULL}, indicating that data of the closest
 #'   station with data will be used. Units: mm/day.
-#' @param RELHUM (optional) Dataframe with two columns: DATE : POSIXct, RELHUM : num. 
-#'   This parameter refers to data, which should be used instead if RELHUM variable 
-#'   is missing for a station. Default \code{RELHUM = NULL}, indicating that data of the closest 
+#' @param RELHUM (optional) Dataframe with two columns: DATE : POSIXct, RELHUM : num.
+#'   This parameter refers to data, which should be used instead if RELHUM variable
+#'   is missing for a station. Default \code{RELHUM = NULL}, indicating that data of the closest
 #'   station with data will be used. Units: ratio 0-1.
-#' @param WNDSPD (optional) Dataframe with two columns: DATE : POSIXct, WNDSPD : num. 
-#'   This parameter refers to data, which should be used instead if WNDSPD variable 
-#'   is missing for a station. Default \code{WNDSPD = NULL}, indicating that data of the closest 
+#' @param WNDSPD (optional) Dataframe with two columns: DATE : POSIXct, WNDSPD : num.
+#'   This parameter refers to data, which should be used instead if WNDSPD variable
+#'   is missing for a station. Default \code{WNDSPD = NULL}, indicating that data of the closest
 #'   station with data will be used. Units: m/s.
-#' @param MAXHHR (optional) Dataframe with two columns: DATE : POSIXct, MAXHHR : num. 
-#'   This parameter refers to data, which should be used instead if MAXHHR variable 
-#'   is missing for a station. Default \code{MAXHHR = NULL}, indicating that data of the closest 
+#' @param MAXHHR (optional) Dataframe with two columns: DATE : POSIXct, MAXHHR : num.
+#'   This parameter refers to data, which should be used instead if MAXHHR variable
+#'   is missing for a station. Default \code{MAXHHR = NULL}, indicating that data of the closest
 #'   station with data will be used. Units: mm.
-#' @param SLR (optional) Dataframe with two columns: DATE : POSIXct, SLR : num. 
-#'   This parameter refers to data, which should be used instead if SLR variable 
-#'   is missing for a station. Default \code{SLR = NULL}, indicating that data of the closest 
+#' @param SLR (optional) Dataframe with two columns: DATE : POSIXct, SLR : num.
+#'   This parameter refers to data, which should be used instead if SLR variable
+#'   is missing for a station. Default \code{SLR = NULL}, indicating that data of the closest
 #'   station with data will be used. Units: MJ/m2.
-#' @param NA_values (optional) Numeric value indicating values in the 
+#' @param NA_values (optional) Numeric value indicating values in the
 #'   dataframe that should be considered as missing. Default is \code{-99}.
 #' @importFrom stats aggregate sd
 #' @importFrom sf st_coordinates st_transform st_crs st_drop_geometry
@@ -279,17 +279,17 @@ prepare_wgn <- function(meteo_lst, TMP_MAX = NULL, TMP_MIN = NULL, PCP = NULL, R
     print("Coordinate system checked and transformed to EPSG:4326.")
   }
   ##Converting station data to dataframe with needed columns
-  st_df <- st_df %>% 
-    rename(NAME = Name, ELEVATION = Elevation) %>% 
+  st_df <- st_df %>%
+    rename(NAME = Name, ELEVATION = Elevation) %>%
     mutate(LONG = st_coordinates(.)[,1],
-           LAT = st_coordinates(.)[,2]) %>% 
-    st_drop_geometry() %>% 
-    select(ID, NAME, LAT, LONG, ELEVATION) 
-  ##Checking if variables are not missing 
+           LAT = st_coordinates(.)[,2]) %>%
+    st_drop_geometry() %>%
+    select(ID, NAME, LAT, LONG, ELEVATION)
+  ##Checking if variables are not missing
   stations <- names(data)
   all_p <- c("TMP_MAX", "TMP_MIN","PCP", "RELHUM", "WNDSPD", "MAXHHR", "SLR")
   c <- c()
-  ##Checking missing variables for every stations 
+  ##Checking missing variables for every stations
   for(st in stations){
     missing_p <- all_p[!all_p %in% as.vector(names(data[[st]]))]
     c <- c(c, missing_p[!missing_p %in% c])
@@ -307,7 +307,7 @@ prepare_wgn <- function(meteo_lst, TMP_MAX = NULL, TMP_MIN = NULL, PCP = NULL, R
     if ("MAXHHR" %in% c_f) missing_maxhhr <- TRUE
     if(length(c_f)>0){
       warning(paste("These variables", paste(as.character(c_f), sep="' '", collapse=", "), "are missing for some of the stations.
-      Closest stations with data will be used to fill existing gaps.", if("MAXHHR" %in% c_f){"MAXHHR will be calculated by PCP*0.38."}, "\n", 
+      Closest stations with data will be used to fill existing gaps.", if("MAXHHR" %in% c_f){"MAXHHR will be calculated by PCP*0.38."}, "\n",
       "Please use optional function parameters, if you want specific data to be used in filling missing variables for stations."))
       if(missing_maxhhr) c_f <- setdiff(c_f, "MAXHHR")
       if(length(c_f)>0) data <- fill_with_closest(meteo_lst, c_f) %>% .$data
@@ -336,7 +336,7 @@ prepare_wgn <- function(meteo_lst, TMP_MAX = NULL, TMP_MIN = NULL, PCP = NULL, R
       }
     }
     ##Transforming to dataframe
-    df <- list_to_df(df) %>% 
+    df <- list_to_df(df) %>%
       mutate(mon = month(DATE))
     # Replace all -99 values with NA in the dataframe 'df'
     df[df == NA_values] <- NA
@@ -378,23 +378,23 @@ prepare_wgn <- function(meteo_lst, TMP_MAX = NULL, TMP_MIN = NULL, PCP = NULL, R
 
 #' Prepare or Update Climate Data Text Input Files in SWAT+ Model
 #'
-#' This function prepares or updates climate data text input files in a SWAT+ 
+#' This function prepares or updates climate data text input files in a SWAT+
 #' model based on the provided meteo_lst.
 #'
-#' @param meteo_lst Nested list with dataframes. 
-#'   Nested structure: \code{meteo_lst -> data -> Station ID -> Parameter -> 
-#'   Dataframe (DATE, PARAMETER)}, 
-#'   \code{meteo_lst -> stations -> Dataframe (ID, Name, Elevation, Source, 
+#' @param meteo_lst Nested list with dataframes.
+#'   Nested structure: \code{meteo_lst -> data -> Station ID -> Parameter ->
+#'   Dataframe (DATE, PARAMETER)},
+#'   \code{meteo_lst -> stations -> Dataframe (ID, Name, Elevation, Source,
 #'   geometry, Long, Lat)}. \cr\cr
-#'   meteo_lst can be created using \code{\link{load_template}} function using 
+#'   meteo_lst can be created using \code{\link{load_template}} function using
 #'   'xlsx' template file or it could to be created with \code{\link{load_swat_weather}}
 #'   function loading information from SWAT+ model setup weather files.
 #' @param write_path Character, path to the SWAT+ txtinout folder (example "my_model").
-#' @param period_starts (optional) Character, date string (example '1991-01-01'). 
+#' @param period_starts (optional) Character, date string (example '1991-01-01').
 #' Default \code{period_starts = NA}, stands for all available in data.
-#' @param period_ends (optional) Character, date string (example '2020-12-31'). 
+#' @param period_ends (optional) Character, date string (example '2020-12-31').
 #' Default \code{period_ends = NA}, stands for all available in data.
-#' @param clean_files Logical, if TRUE, will remove all existing weather files 
+#' @param clean_files Logical, if TRUE, will remove all existing weather files
 #' in model setup folder before writing new ones. Default \code{clean_files = TRUE}.
 #' @importFrom purrr map
 #' @importFrom dplyr filter %>% mutate select mutate_if mutate_at mutate_all rename full_join contains arrange
@@ -466,27 +466,27 @@ prepare_climate <- function(meteo_lst, write_path, period_starts = NA, period_en
     period_starts <- as.POSIXct(paste(period_starts, "00:00:00"), tz = "UTC")
     period_ends   <- as.POSIXct(paste(period_ends, "23:59:59"), tz = "UTC")
     meteo_lst$data <- map(meteo_lst$data, ~ map(.x, ~ mutate(.x, DATE = as.POSIXct(DATE, tz = "UTC"))))
-  } 
+  }
   meteo_lst$data <- map(meteo_lst$data, ~map(.x, ~filter(.x, DATE >= period_starts & DATE <= period_ends)))
 
   ##Preparing wgn parameters
   wgn <- prepare_wgn(meteo_lst)
-  
+
   ##Writing weather-wgn.cli file
   fname <- "weather-wgn.cli"
   ##First line to be printed into file
   text_l <- paste0(fname, hd_txt)
   ##Stations info
-  df1 <- wgn$wgn_st %>% 
-    mutate(ID = paste0("ID", ID)) %>% 
-    select(-NAME) %>% 
+  df1 <- wgn$wgn_st %>%
+    mutate(ID = paste0("ID", ID)) %>%
+    select(-NAME) %>%
     mutate_at(vars(c(LAT, LONG, ELEVATION)), ~sprintf(., fmt = '%#.5f'))
   ##Station data
-  df2 <- wgn$wgn_data %>% 
-    mutate(ID = paste0("ID", wgn_id)) %>% 
-    select(-c(id, month, wgn_id)) %>% 
+  df2 <- wgn$wgn_data %>%
+    mutate(ID = paste0("ID", wgn_id)) %>%
+    select(-c(id, month, wgn_id)) %>%
     mutate_if(is.numeric, ~sprintf(., fmt = '%#.5f'))
-  ##Defining spacing in written files 
+  ##Defining spacing in written files
   st_hd <- c('%-30s', rep('%-13s', 2), '%-15s', '%-3s')
   st_dt <- c(rep('%13s', 14))
   ##Printing heading line
@@ -503,27 +503,27 @@ prepare_climate <- function(meteo_lst, write_path, period_starts = NA, period_en
     df_to_txt(write_path, fname, s2, st_dt)
   }
   print(paste0(fname, " file was successfully written."))
-  
+
   ##Writing weather-sta.cli file
   fname <- "weather-sta.cli"
   ##File heading line
   text_l <- paste0(fname, hd_txt)
   write.table(text_l, paste0(write_path, "/", fname), append = FALSE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, quote = FALSE)
   ##Creating station names from coordinates (example s52699n18600e)
-  station_names <- mutate_all(df1[c("LAT", "LONG")], ~sprintf(., fmt = '%#.6s')) %>% 
+  station_names <- mutate_all(df1[c("LAT", "LONG")], ~sprintf(., fmt = '%#.6s')) %>%
     mutate(name =  gsub("\\.", "", as.character(paste0("s", LAT, "n", LONG, "e"))))
   ##Finding closest meteo station to each variable in selected station
   d <- find_closest(meteo_lst)
   ##Writing file names for different variables
-  weather_sta_cli <- data.frame(name=station_names$name, 
-                                wgn = df1$ID, 
+  weather_sta_cli <- data.frame(name=station_names$name,
+                                wgn = df1$ID,
                                 pcp = paste0("sta_", tolower(d$PCP), ".pcp"),
                                 tmp = paste0("sta_", tolower(d$TMP_MAX), ".tmp"),
                                 slr = paste0("sta_", tolower(d$SLR), ".slr"),
                                 hmd = paste0("sta_", tolower(d$RELHUM), ".hmd"),
                                 wnd = paste0("sta_", tolower(d$WNDSPD), ".wnd"),
                                 pet = "null",
-                                atmo_dep = "atmodep.cli") %>% 
+                                atmo_dep = "atmodep.cli") %>%
     arrange(wgn)
   ##Spacing
   st_hd <- c('%-26s', '%6s', rep('%25s', 7))
@@ -531,22 +531,22 @@ prepare_climate <- function(meteo_lst, write_path, period_starts = NA, period_en
   ##Filing file with dataframe information
   df_to_txt(write_path, fname, weather_sta_cli, st_hd)
   print(paste0(fname, " file was successfully written."))
-  
+
   ##Writing weather variable files
-  p_lst <- list("pcp" = list("PCP", "Precipitation"), 
-                "slr" = list("SLR", "Solar radiation"), 
-                "hmd" = list("RELHUM", "Relative humidity"), 
-                "tmp" = list(c("TMP_MAX", "TMP_MIN"), "Temperature"), 
-                "wnd" = list("WNDSPD", "Wind speed"), 
-                "pet" = list("PET", "PET"), 
+  p_lst <- list("pcp" = list("PCP", "Precipitation"),
+                "slr" = list("SLR", "Solar radiation"),
+                "hmd" = list("RELHUM", "Relative humidity"),
+                "tmp" = list(c("TMP_MAX", "TMP_MIN"), "Temperature"),
+                "wnd" = list("WNDSPD", "Wind speed"),
+                "pet" = list("PET", "PET"),
                 "atmo_dep" = list("ATMO_DEP", "Atmospheric deposition"))
   ##Preparing general info for station
-  df1_cli <- df1 %>% 
-    mutate_at(vars(LAT, LONG, ELEVATION), ~format(round(as.numeric(.), 3), nsmall = 3)) %>% 
-    rename(lat = LAT, lon = LONG, elev = ELEVATION, nbyr = RAIN_YRS) %>% 
-    mutate(tstep = 0) %>% 
-    select(ID, nbyr, tstep, lat, lon, elev) %>% 
-    mutate(ID = tolower(ID)) %>% 
+  df1_cli <- df1 %>%
+    mutate_at(vars(LAT, LONG, ELEVATION), ~format(round(as.numeric(.), 3), nsmall = 3)) %>%
+    rename(lat = LAT, lon = LONG, elev = ELEVATION, nbyr = RAIN_YRS) %>%
+    mutate(tstep = 0) %>%
+    select(ID, nbyr, tstep, lat, lon, elev) %>%
+    mutate(ID = tolower(ID)) %>%
     arrange(ID)
   ##Loop to write for each variable
   for(cli in names(weather_sta_cli[c(3:7)])){
@@ -570,7 +570,7 @@ prepare_climate <- function(meteo_lst, write_path, period_starts = NA, period_en
       df_to_txt(write_path, fname, s2, st_hd)
       ##Identifying temperature as should be joined two variables
       if(cli == "tmp"){
-        wdf <- meteo_lst[["data"]][[toupper(id)]][[p_lst[[cli]][[1]][[1]]]] %>% 
+        wdf <- meteo_lst[["data"]][[toupper(id)]][[p_lst[[cli]][[1]][[1]]]] %>%
           full_join(meteo_lst[["data"]][[toupper(id)]][[p_lst[[cli]][[1]][[2]]]], by = "DATE")
         st_dt <- c('%-6s', rep('%7s', 3))
       } else {
@@ -579,16 +579,16 @@ prepare_climate <- function(meteo_lst, write_path, period_starts = NA, period_en
       }
       ##Writing file for each variable and station
       wdf <- wdf %>%
-        mutate(year = year(DATE), day = yday(DATE)) %>% 
-        select(year, day, contains(p_lst[[cli]][[1]])) %>% 
-        mutate_at(vars(contains(p_lst[[cli]][[1]])), ~format(round(as.numeric(.), 3), nsmall = 3)) 
+        mutate(year = year(DATE), day = yday(DATE)) %>%
+        select(year, day, contains(p_lst[[cli]][[1]])) %>%
+        mutate_at(vars(contains(p_lst[[cli]][[1]])), ~format(round(as.numeric(.), 3), nsmall = 3))
       df_to_txt(write_path, fname, wdf, st_dt)
     }
     print(paste0(cli, " files were successfully written."))
   }
-  
+
   ##Updating all required files
-  ##Preparing GIS info for find nearest 
+  ##Preparing GIS info for find nearest
   wst_sf <- st_as_sf(station_names, coords = c("LONG", "LAT"), crs = 4326)
   ##Defining spacing of output files and updating each file
   spacing <- c('%8s', '%-12s', rep('%12s', 5), '%8s', '%16s', rep('%8s', 4))
@@ -619,16 +619,16 @@ prepare_climate <- function(meteo_lst, write_path, period_starts = NA, period_en
   } else {
     warning(paste("rout_unit.con file was not found in", write_path, "and was not updated."))
   }
-  
+
   ##Creating temp folder to save all updated files before overwriting them into main directory
   f_dir <- paste(write_path, "temp", sep = '/')
   if(!dir.exists(f_dir)){
     dir.create(f_dir)
-  } 
+  }
   ##Modifying time.sim to be same as weather data
   fname <- "time.sim"
   if(!file.exists(paste(write_path, fname, sep = "/"))){
-    warning(paste("'time.sim' file was not found in", write_path, "and was not updated. 
+    warning(paste("'time.sim' file was not found in", write_path, "and was not updated.
                 Please make sure 'yrc_start' is", year(period_starts), "and 'yrc_end' is", year(period_ends), "."))
   } else {
     f_write <- paste(f_dir, fname, sep = "/")
@@ -654,49 +654,49 @@ prepare_climate <- function(meteo_lst, write_path, period_starts = NA, period_en
 
 #' Prepare user soil table for SWAT model
 #'
-#' This function prepares a user soil table for the SWAT model based on the 
+#' This function prepares a user soil table for the SWAT model based on the
 #' provided CSV file. The function requires the `euptf2` package to be installed.
 #'
-#' @param csv_path Character path to the CSV file (e.g., "usersoil_lrew.csv"). 
+#' @param csv_path Character path to the CSV file (e.g., "usersoil_lrew.csv").
 #'   The file should be comma-separated with minimum columns of:
-#'   - SNAM - name of soil type, 
+#'   - SNAM - name of soil type,
 #'   - NLAYERS - number of soil layers in the soil, and for each soil layer i (minimum 1).
-#'   - SOL_Zi - depth from soil surface to bottom of layer in mm; 
+#'   - SOL_Zi - depth from soil surface to bottom of layer in mm;
 #'   - CLAYi - clay content (particles <0.002 mm) in % soil weight;
-#'   - SILTi - silt content (particles between 0.002 and 0.05 mm) in % soil weight; 
-#'   - SANDi - sand content (particles between 0.05 and 2 mm) in % soil weight; 
+#'   - SILTi - silt content (particles between 0.002 and 0.05 mm) in % soil weight;
+#'   - SANDi - sand content (particles between 0.05 and 2 mm) in % soil weight;
 #'   - SOL_CBNi - organic carbon content (% soil weight) for each available soil layer.
-#' @param hsg (optional) Logical, TRUE - prepare soil hydrological groups, 
-#' FALSE - no soil hydrological group preparation will be done. 
-#' Default \code{ hsg = FALSE}. If \code{hsg = TRUE}, three additional columns 
-#' should be in an input table: \cr 
-#'  - 'Impervious' - depth to water impermeable layer (allowed values are "<50cm", 
+#' @param hsg (optional) Logical, TRUE - prepare soil hydrological groups,
+#' FALSE - no soil hydrological group preparation will be done.
+#' Default \code{ hsg = FALSE}. If \code{hsg = TRUE}, three additional columns
+#' should be in an input table: \cr
+#'  - 'Impervious' - depth to water impermeable layer (allowed values are "<50cm",
 #'  "50-100cm", ">100cm");
-#'  - 'Depth' - depth to high water table  (allowed values are "<60cm", "60-100cm", 
+#'  - 'Depth' - depth to high water table  (allowed values are "<60cm", "60-100cm",
 #'  ">100cm");
-#'  - 'Drained' - information on tile drains (allowed values are "Y" for drained 
+#'  - 'Drained' - information on tile drains (allowed values are "Y" for drained
 #'  areas, "N" for areas without working tile drains). \cr
-#'  More information can be found in the SWAT+ modeling protocol 
+#'  More information can be found in the SWAT+ modeling protocol
 #' \href{https://doi.org/10.5281/zenodo.7463395}{Table 3.3}.
 #' @param keep_values (optional) Logical or character vector, TRUE - keep original
-#'  values (only 0 or NA values of the original input table are overwritten with 
-#'  the values computed by the function, else original values are kept), 
-#'  FALSE - all original values are overwritten with the values computed by the 
+#'  values (only 0 or NA values of the original input table are overwritten with
+#'  the values computed by the function, else original values are kept),
+#'  FALSE - all original values are overwritten with the values computed by the
 #'  function. \cr\cr
 #'  If a character vector is provided, it should contain names of columns to keep.
-#'  For instance, c("HYDGRP", "ROCK1") would keep values of soil 
-#'  hydrologic groups and rock content data of the first layer, while 
-#'  c("HYDGRP", "ROCK") would keep values of soil hydrologic groups and 
+#'  For instance, c("HYDGRP", "ROCK1") would keep values of soil
+#'  hydrologic groups and rock content data of the first layer, while
+#'  c("HYDGRP", "ROCK") would keep values of soil hydrologic groups and
 #'  rock content data of all soil layers. \cr
 #'  Default \code{keep_values = FALSE}.
-#' @param nb_lyr (optional) Integer, the number of layers resulting user soil 
-#' data should contain. Default \code{nb_lyr = NA}, which stands for the 
+#' @param nb_lyr (optional) Integer, the number of layers resulting user soil
+#' data should contain. Default \code{nb_lyr = NA}, which stands for the
 #' same number as in the input data.
 #' @importFrom dplyr select ends_with starts_with left_join
 #' @importFrom readr parse_number
 #' @importFrom utils type.convert
 #' @importFrom methods is
-#' @return A dataframe with a fully formatted and filled table of soil parameters 
+#' @return A dataframe with a fully formatted and filled table of soil parameters
 #' for the SWAT model.
 #' @export
 #'
@@ -705,26 +705,26 @@ prepare_climate <- function(meteo_lst, write_path, period_starts = NA, period_en
 #'   usersoils <- get_usersoil_table("table.csv")
 #'   write.csv(usersoils, "usersoils.csv", row.names=FALSE, quote=FALSE)
 #' }
-#' @references 
+#' @references
 #' SWAT+ Modeling Protocol: Soil Physical Data Chapter
-#' 
-#' This function utilizes the PTF functions and methods described in pages 82-91. 
+#'
+#' This function utilizes the PTF functions and methods described in pages 82-91.
 #' For detailed information, refer to: \url{https://doi.org/10.5281/zenodo.7463395}
 #' @keywords parameters
-#' @seealso 
-#' This function requires the euptf2 package. 
+#' @seealso
+#' This function requires the euptf2 package.
 #' Please read information on its installation and description on \url{https://github.com/tkdweber/euptf2}.
 
 get_usersoil_table <- function(csv_path, hsg = FALSE, keep_values = FALSE, nb_lyr = NA){
   ##Reading
-  df_save <- df <- read.csv2(csv_path, sep = ",") %>% 
+  df_save <- df <- read.csv2(csv_path, sep = ",") %>%
     type.convert(as.is = TRUE)
   is_OK <- TRUE
-  c_names <- c("SOL_Z", "SOL_BD", "SOL_AWC", "SOL_K", "SOL_CBN", "CLAY", "SILT", "SAND", "ROCK", 
+  c_names <- c("SOL_Z", "SOL_BD", "SOL_AWC", "SOL_K", "SOL_CBN", "CLAY", "SILT", "SAND", "ROCK",
                "SOL_ALB", "USLE_K", "SOL_EC", "SOL_CAL", "SOL_PH")
-  ##Checking all 
+  ##Checking all
   if(dim(df)[2] < 7){
-    stop("Your data were not read properly. If your use .csv file path, please ensure column separator is comma. 
+    stop("Your data were not read properly. If your use .csv file path, please ensure column separator is comma.
        Minimum columns available should be 'SNAM', 'NLAYERS' and for each layer 'SOL_Z', 'CLAY', 'SILT', 'SAND', 'SOL_CBN' (for example 'SOL_Z1', 'CLAY1', etc.).")
   }
   if(!"SNAM" %in% names(df)){
@@ -734,7 +734,7 @@ get_usersoil_table <- function(csv_path, hsg = FALSE, keep_values = FALSE, nb_ly
     warning("'SNAM' values are missing!!! Please correct this.")
     is_OK <- FALSE
   }
-  
+
   if(!"NLAYERS" %in% names(df)){
     warning("'NLAYERS' column is missing!!!")
     is_OK <- FALSE
@@ -742,7 +742,7 @@ get_usersoil_table <- function(csv_path, hsg = FALSE, keep_values = FALSE, nb_ly
     warning("'SNAM' values are missing or input is not all numbers!!! Please correct this.")
     is_OK <- FALSE
   }
-  
+
   if(!"SOL_Z1" %in% names(df)){
     warning("'SOL_Z1' column is missing!!!")
     is_OK <- FALSE
@@ -750,7 +750,7 @@ get_usersoil_table <- function(csv_path, hsg = FALSE, keep_values = FALSE, nb_ly
     warning("At least some of 'SOL_Z1' values are missing or input values are not between 0 - 3000!!! Please correct this.")
     is_OK <- FALSE
   }
-  
+
   for (p in c('CLAY1', 'SILT1', 'SAND1', 'SOL_CBN1')){
     if(!p %in% names(df)){
       warning(paste0(p, " column is missing!!!"))
@@ -760,7 +760,7 @@ get_usersoil_table <- function(csv_path, hsg = FALSE, keep_values = FALSE, nb_ly
       is_OK <- FALSE
     }
   }
-  
+
   if(hsg){
     if(!"Impervious" %in% names(df)){
       warning("'Impervious' column is missing!!!")
@@ -784,56 +784,56 @@ get_usersoil_table <- function(csv_path, hsg = FALSE, keep_values = FALSE, nb_ly
       is_OK <- FALSE
     }
   }
-  
+
   if(!is_OK){
     stop("Please make sure all indicated problems are solved before using this function!!!")
   }
-  
+
   ##Selecting only required layers
   df <- select(df, SNAM, NLAYERS, starts_with(c("SOL_Z", 'CLAY', 'SILT', 'SAND', 'SOL_CBN')), -starts_with("SOL_ZMX"))
-  
+
   ##Getting rid of empty layers
   max_lyr_start <- max_lyr <- max(parse_number(names(df[c(3:dim(df)[2])])), na.rm = TRUE)
   while (all(select(df, ends_with(as.character(max_lyr)))==0)) {
     df <- select(df, -ends_with(as.character(max_lyr)))
     max_lyr <- max_lyr - 1
   }
-  
+
   ##Calculating parameters
   soilp <- get_soil_parameters(df)
-  
-  ##Solving multiple layers problems 
+
+  ##Solving multiple layers problems
   for(i in 1:max_lyr){
     for(ii in 1:nrow(soilp)){
       soilp[ii, paste0(c_names, i)] <- if(!soilp[ii,paste0("SOL_Z", i)] > 0) 0 else  as.vector(unlist(soilp[ii, paste0(c_names, i)]))
     }
   }
-  
+
   ##Calculating soil hydro groups
   if(hsg){
     df_hsg <- left_join(df_save, soilp %>% select(SNAM, starts_with("SOL_K")), by = "SNAM")
     c <- c()
     for (i in 1:nrow(df_hsg)){
-      c <- c(c, get_hsg(df_hsg[i,"Impervious"], 
-                        df_hsg[i,"Depth"], 
-                        df_hsg[i,"Drained"], 
+      c <- c(c, get_hsg(df_hsg[i,"Impervious"],
+                        df_hsg[i,"Depth"],
+                        df_hsg[i,"Drained"],
                         df_hsg[i,c(paste0("SOL_Z", 1:df_hsg$NLAYERS[i]),paste0("SOL_K", 1:df_hsg$NLAYERS[i]))]))
     }
     soilp$HYDGRP <- c
     print("Soil hydrological groups were calculated.")
   }
-  
+
   ##Taking care of number of layers
   if(!is.na(nb_lyr) && is(nb_lyr, "numeric") && nb_lyr%%1==0 && nb_lyr > max_lyr){
     print(paste0("Adding additional ", nb_lyr - max_lyr_start, " layer(s) added."))
     max_lyr_start <- nb_lyr
   }
-  
+
   for(i in seq(max_lyr+1, max_lyr_start)){
-    soilp[paste0(c("SOL_Z", "SOL_BD", "SOL_AWC", "SOL_K", "SOL_CBN", "CLAY", "SILT", "SAND", "ROCK", 
+    soilp[paste0(c("SOL_Z", "SOL_BD", "SOL_AWC", "SOL_K", "SOL_CBN", "CLAY", "SILT", "SAND", "ROCK",
                    "SOL_ALB", "USLE_K", "SOL_EC", "SOL_CAL", "SOL_PH"), i)] <- 0
   }
-  
+
   ##Overwriting results with existing values in input table
   if(is.character(keep_values) || keep_values){
     ##In case keep_values is vector of characters
@@ -841,7 +841,7 @@ get_usersoil_table <- function(csv_path, hsg = FALSE, keep_values = FALSE, nb_ly
       for(sn in keep_values){
         soilp[, grepl(sn , names(soilp))] <- df_save[, grepl(sn , names(df_save))]
         col_names <- names(df_save[grepl(sn , names(df_save))])
-        print(paste0(paste(col_names, collapse = ", "), " column", if(length(col_names)==1) "" else "s",  
+        print(paste0(paste(col_names, collapse = ", "), " column", if(length(col_names)==1) "" else "s",
                      if(length(col_names)==1) " was " else " were ", "kept."))
       }
     } else {
@@ -853,13 +853,13 @@ get_usersoil_table <- function(csv_path, hsg = FALSE, keep_values = FALSE, nb_ly
           soilp[,sn] <- ifelse(soilp[,paste0(sn, ".x")] > 0, soilp[,paste0(sn, ".x")], soilp[,sn])
         } else if(sn %in% c("MUID", "S5ID", "CMPPCT", "HYDGRP", "ANION_EXCL", "SOL_CRK", "TEXTURE") && (paste0(sn, ".x") %in% names(df_save))){
           soilp[,sn] <- ifelse(!is.na(soilp[,paste0(sn, ".x")]), soilp[,paste0(sn, ".x")], soilp[,sn])
-        } 
+        }
       }
       soilp <- select(soilp, -ends_with(".x"))
       print("Values existing in the input table were kept.")
     }
   }
-  
+
   return(soilp)
 }
 
@@ -885,15 +885,15 @@ get_soil_parameters <- function(soilp){
   soilp["SOL_ZMX"] <- do.call(pmax, c(soilp[sol_z], list(na.rm=TRUE)))
   ##Loop to fill parameters for each layer
   for(i in seq_along(sol_z)){
-    soilp[,paste0("BD", i)] <- ifelse(soilp[,paste0("SOL_CBN", i)] < 12, 
-                                      1.72 - 0.294 * (soilp[,paste0("SOL_CBN", i)] ^ 0.5), 
+    soilp[,paste0("BD", i)] <- ifelse(soilp[,paste0("SOL_CBN", i)] < 12,
+                                      1.72 - 0.294 * (soilp[,paste0("SOL_CBN", i)] ^ 0.5),
                                       0.074 + 2.632 * exp(-0.076*( soilp[,paste0("SOL_CBN", i)])))
-    soilp[,paste0("SOL_BD", i)] <- ifelse(soilp[,paste0("SOL_CBN", i)] > 0.58,  soilp[,paste0("BD", i)] + 0.009 * soilp[,paste0("CLAY", i)], 
+    soilp[,paste0("SOL_BD", i)] <- ifelse(soilp[,paste0("SOL_CBN", i)] > 0.58,  soilp[,paste0("BD", i)] + 0.009 * soilp[,paste0("CLAY", i)],
                                           soilp[,paste0("BD", i)] + 0.005 * soilp[,paste0("CLAY", i)]+ 0.001 * soilp[,paste0("SILT", i)])
     if(i == 1){
       soilp[paste0("DEPTH_M", i)] <- soilp[paste0("SOL_Z", i)] * 0.05
     } else {
-      soilp[paste0("DEPTH_M", i)] <- ((soilp[paste0("SOL_Z", i)] - soilp[paste0("SOL_Z", i - 1)])/2 + 
+      soilp[paste0("DEPTH_M", i)] <- ((soilp[paste0("SOL_Z", i)] - soilp[paste0("SOL_Z", i - 1)])/2 +
                                         soilp[paste0("SOL_Z", i - 1)])/10
     }
     input <- soilp[c("rownum", paste0("DEPTH_M", i), paste0("BD", i), paste0("SOL_CBN", i), paste0("CLAY", i),
@@ -918,7 +918,7 @@ get_soil_parameters <- function(soilp){
     pred_VG$THS <- ifelse((((pred_VG$OC > 12 & is.na(pred_VG$USCLAY)) | (pred_VG$OC >= (12+pred_VG$USCLAY*0.1) & pred_VG$USCLAY < 60) | (pred_VG$OC >= 18 & pred_VG$USCLAY>=60)) & pred_VG$DEPTH_M <= 30), 0.697, pred_VG$THS)
     pred_VG$ALP <- ifelse((((pred_VG$OC > 12 & is.na(pred_VG$USCLAY)) | (pred_VG$OC >= (12+pred_VG$USCLAY*0.1) & pred_VG$USCLAY < 60) | (pred_VG$OC >= 18 & pred_VG$USCLAY>=60)) & pred_VG$DEPTH_M <= 30), 0.0069, pred_VG$ALP)
     pred_VG$N <- ifelse((((pred_VG$OC > 12 & is.na(pred_VG$USCLAY)) | (pred_VG$OC >= (12+pred_VG$USCLAY*0.1) & pred_VG$USCLAY < 60) | (pred_VG$OC >= 18 & pred_VG$USCLAY>=60)) & pred_VG$DEPTH_M <= 30), 1.4688, pred_VG$N)
-    
+
     pred_VG$THR <- ifelse((((pred_VG$OC > 12 & is.na(pred_VG$USCLAY)) | (pred_VG$OC >= (12+pred_VG$USCLAY*0.1) & pred_VG$USCLAY < 60) | (pred_VG$OC >= 18 & pred_VG$USCLAY>=60)) & pred_VG$DEPTH_M > 30), 0.000, pred_VG$THR)
     pred_VG$THS <- ifelse((((pred_VG$OC > 12 & is.na(pred_VG$USCLAY)) | (pred_VG$OC >= (12+pred_VG$USCLAY*0.1) & pred_VG$USCLAY < 60) | (pred_VG$OC >= 18 & pred_VG$USCLAY>=60)) & pred_VG$DEPTH_M > 30), 0.835, pred_VG$THS)
     pred_VG$ALP <- ifelse((((pred_VG$OC > 12 & is.na(pred_VG$USCLAY)) | (pred_VG$OC >= (12+pred_VG$USCLAY*0.1) & pred_VG$USCLAY < 60) | (pred_VG$OC >= 18 & pred_VG$USCLAY>=60)) & pred_VG$DEPTH_M > 30), 0.0113, pred_VG$ALP)
@@ -947,13 +947,13 @@ get_soil_parameters <- function(soilp){
     soilp[paste0("SOL_PH", i)] <- 0
   }
   ##Formating table
-  soilpf <- data.frame(OBJECTID = soilp$rownum, MUID = "", SEQN = 1, SNAM = soilp$SNAM, S5ID = "", CMPPCT = 1, NLAYERS = soilp$NLAYERS, 
+  soilpf <- data.frame(OBJECTID = soilp$rownum, MUID = "", SEQN = 1, SNAM = soilp$SNAM, S5ID = "", CMPPCT = 1, NLAYERS = soilp$NLAYERS,
                        HYDGRP = "", SOL_ZMX = soilp$SOL_ZMX, ANION_EXCL = 0.5, SOL_CRK = 0.5, TEXTURE = "")
-  
+
   for(i in seq_along(sol_z)){
-    sel_cols <- paste0(c("SOL_Z", "SOL_BD", "SOL_AWC", "SOL_K", "SOL_CBN", "CLAY", "SILT", "SAND", "ROCK", 
+    sel_cols <- paste0(c("SOL_Z", "SOL_BD", "SOL_AWC", "SOL_K", "SOL_CBN", "CLAY", "SILT", "SAND", "ROCK",
                          "SOL_ALB", "USLE_K", "SOL_EC", "SOL_CAL", "SOL_PH"), i)
-    soilpf[sel_cols]  <- soilp[sel_cols] 
+    soilpf[sel_cols]  <- soilp[sel_cols]
   }
   return(soilpf)
 }
@@ -969,7 +969,7 @@ get_soil_parameters <- function(soilp){
 #'
 #' @examples
 #' \dontrun{
-#' df <- data.frame(SOL_K1 = 10, SOL_K2 = 1, SOL_K3 = 2, 
+#' df <- data.frame(SOL_K1 = 10, SOL_K2 = 1, SOL_K3 = 2,
 #'                  SOL_Z1 = 250, SOL_Z2 = 700, SOL_Z3 = 1000)
 #' get_hsg(d_imp = ">100cm", d_wtr = "<60cm", drn = "Y", df)
 #' }
@@ -1069,13 +1069,13 @@ get_hsg <- function(d_imp, d_wtr, drn, t){
 }
 
 #' Convert 'usersoil.csv' to 'soils.sol'
-#' 
-#' This function converts a user-defined soil CSV file to the soils.sol file 
+#'
+#' This function converts a user-defined soil CSV file to the soils.sol file
 #' required for SWAT+ model input.
 #'
-#' @param csv_path Character, path to CSV file containing user-defined soil 
-#' information (example "usersoil_lrew.csv"). 
-#' The CSV file should have the following columns (* indicates not required, yet 
+#' @param csv_path Character, path to CSV file containing user-defined soil
+#' information (example "usersoil_lrew.csv").
+#' The CSV file should have the following columns (* indicates not required, yet
 #' column should be present in the CSV file):
 #'   - OBJECTID*: Identifier for each record.
 #'   - MUID*: STATSGO mapping unit identifier.
@@ -1095,11 +1095,11 @@ get_hsg <- function(d_imp, d_wtr, drn, t){
 #'   - SOL_AWC1 - SOL_AWC10: Available water capacity of each layer. Units: mm H2O/mm soil;
 #'   - SOL_K1 - SOL_K10: Saturated hydraulic conductivity of each layer. Units: mm/hr;
 #'   - SOL_CBN1 - SOL_CBN10: Carbon content of each layer. Units: % soil weight;
-#'   - CLAY1 - CLAY10: Clay  (particles <0.002 mm) content of each layer. 
+#'   - CLAY1 - CLAY10: Clay  (particles <0.002 mm) content of each layer.
 #'   Units: % soil weight;
-#'   - SILT1 - SILT10: Silt (particles between 0.002 and 0.05 mm) 
+#'   - SILT1 - SILT10: Silt (particles between 0.002 and 0.05 mm)
 #'   content of each layer. Units: % soil weight;
-#'   - SAND1 - SAND10: Sand (particles between 0.05 and 2 mm) 
+#'   - SAND1 - SAND10: Sand (particles between 0.05 and 2 mm)
 #'   content of each layer. Units: % soil weight;
 #'   - ROCK1 - ROCK10: Rock (particles >2 mm) content of each layer. Units: % total weight;
 #'   - SOL_ALB1 - SOL_ALB10: Soil albedo of each layer. Units: ratio (values 0-1);
@@ -1107,17 +1107,17 @@ get_hsg <- function(d_imp, d_wtr, drn, t){
 #'   - SOL_EC1 - SOL_EC10: Soil electrical conductivity of each layer. Units: dS/m;
 #'   - SOL_CAL1 - SOL_CAL10: Soil CaCO3 content of each layer. Units: % (values 0 - 50%);
 #'   - SOL_PH1 - SOL_PH10: Soil pH of each layer. Units: pH (values 3-10). \cr\cr
-#'     Soil properties data can be prepared using \code{\link{get_usersoil_table}} 
-#'     function and saved into the CSV file using 
+#'     Soil properties data can be prepared using \code{\link{get_usersoil_table}}
+#'     function and saved into the CSV file using
 #'     \code{write.csv(usertable, ".my_file.csv", row.names=FALSE, quote=FALSE)}.
-#' @param db_path (optional) Character path to SQLite project database (example 
+#' @param db_path (optional) Character path to SQLite project database (example
 #' "output/project.sqlite"). Default \code{db_path = NULL}, which means SWAT+ model setup
-#' .sqlite database will not be used to reduce the size of the soils.sol file by 
-#' leveraging information from an SQLite database if there are fewer soil types 
+#' .sqlite database will not be used to reduce the size of the soils.sol file by
+#' leveraging information from an SQLite database if there are fewer soil types
 #' in the database compared to the user's soil CSV file.
 #' @importFrom DBI dbConnect dbReadTable dbDisconnect
 #' @importFrom RSQLite SQLite
-#' @importFrom dplyr mutate_all %>% 
+#' @importFrom dplyr mutate_all %>%
 #' @importFrom tidyr pivot_wider pivot_longer
 #' @importFrom stringr str_extract
 #' @importFrom purrr map2_chr
@@ -1131,7 +1131,7 @@ get_hsg <- function(d_imp, d_wtr, drn, t){
 #' # Convert user-defined soil CSV to soils.sol
 #' usersoil_to_sol("output/usersoil_lrew.csv")
 #'
-#' # Convert using an SQLite project database to reduce the size of the soils.sol 
+#' # Convert using an SQLite project database to reduce the size of the soils.sol
 #' file
 #' usersoil_to_sol("output/usersoil_lrew.csv", "output/project.sqlite")
 #' }
@@ -1157,11 +1157,11 @@ usersoil_to_sol <- function(csv_path, db_path = NULL){
   }
   ##Settings to function
   path <- sub("[^/]+$", "", csv_path)
-  c_names <- c("SOL_Z", "SOL_BD", "SOL_AWC", "SOL_K", "SOL_CBN", "CLAY", "SILT", "SAND", "ROCK", 
+  c_names <- c("SOL_Z", "SOL_BD", "SOL_AWC", "SOL_K", "SOL_CBN", "CLAY", "SILT", "SAND", "ROCK",
                "SOL_ALB", "USLE_K", "SOL_EC", "SOL_CAL", "SOL_PH")
-  c_write_names <- c("name", "nly", "hyd_grp", "dp_tot", "anion_excl", "perc_crk", "texture", "dp", "bd", "awc", 
+  c_write_names <- c("name", "nly", "hyd_grp", "dp_tot", "anion_excl", "perc_crk", "texture", "dp", "bd", "awc",
                      "soil_k", "carbon", "clay", "silt", "sand", "rock", "alb", "usle_k", "ec", "caco3", "ph")
-  ##Spacing in output file 
+  ##Spacing in output file
   sol_nam <- c('%-34s', rep('%15s', 6), '%25s', rep('%15s', 13))
   sol_val1 <- c('%-34s', rep('%15s', 6))
   sol_val2 <- c('%156s', rep('%15s', 13))
@@ -1174,7 +1174,7 @@ usersoil_to_sol <- function(csv_path, db_path = NULL){
     max_lyr <- max_lyr - 1
   }
   ##Converting to characters to numeric and fixing decimal places
-  df[c(9:11,13:dim(df)[2])] <- mutate_all(mutate_all(df[c(9:11,13:dim(df)[2])], 
+  df[c(9:11,13:dim(df)[2])] <- mutate_all(mutate_all(df[c(9:11,13:dim(df)[2])],
                                                      function(x) as.numeric(as.character(x))), ~sprintf(., fmt = '%#.5f'))
   ##First line to be printed into file
   text_l <- paste0("soils.sol: written by SWATprepR R package ", Sys.time(), " for SWAT+ rev.60.5.4")
@@ -1185,15 +1185,15 @@ usersoil_to_sol <- function(csv_path, db_path = NULL){
   print("Writing soils.sol started.")
   write_lines(c(text_l, sol_names), nfile, append = FALSE)
   ##df separation to df1 common parameters per profile
-  df1 <- df[c("SNAM", "NLAYERS", "HYDGRP", "SOL_ZMX", "ANION_EXCL", "SOL_CRK", "TEXTURE")] %>% 
+  df1 <- df[c("SNAM", "NLAYERS", "HYDGRP", "SOL_ZMX", "ANION_EXCL", "SOL_CRK", "TEXTURE")] %>%
     mutate(TEXTURE = ifelse(is.na(TEXTURE), "null", TEXTURE))
   ##df2 parameters different in each layer
-  df2 <- df[c(4,13:dim(df)[2])] %>% 
-    pivot_longer(c(-SNAM), names_to = "param", values_to = "values") %>% 
+  df2 <- df[c(4,13:dim(df)[2])] %>%
+    pivot_longer(c(-SNAM), names_to = "param", values_to = "values") %>%
     mutate(n_lyr = parse_number(param),
-           param = gsub('[[:digit:]]+', '', param)) %>% 
+           param = gsub('[[:digit:]]+', '', param)) %>%
     pivot_wider(names_from = param, values_from = values)
-  ##Writing loop into file for each soil type 
+  ##Writing loop into file for each soil type
   for (i in seq_len(nrow(df1))){
     ##Filtering
     s1 <- df1[i,]
@@ -1212,23 +1212,23 @@ usersoil_to_sol <- function(csv_path, db_path = NULL){
 
 #' Update SWAT+ SQLite database with weather data
 #'
-#' This function updates an SWAT+ SQLite database with weather data, including 
+#' This function updates an SWAT+ SQLite database with weather data, including
 #' meteorological and weather generator data.
 #'
-#' @param db_path A character string representing the path to the SWAT+ SQLite database 
+#' @param db_path A character string representing the path to the SWAT+ SQLite database
 #' (e.g., "./output/project.sqlite").
-#' @param meteo_lst A nested list with dataframes. 
-#'   Nested structure: \code{meteo_lst -> data -> Station ID -> Parameter -> 
-#'   Dataframe (DATE, PARAMETER)}, 
-#'   \code{meteo_lst -> stations -> Dataframe (ID, Name, Elevation, Source, 
+#' @param meteo_lst A nested list with dataframes.
+#'   Nested structure: \code{meteo_lst -> data -> Station ID -> Parameter ->
+#'   Dataframe (DATE, PARAMETER)},
+#'   \code{meteo_lst -> stations -> Dataframe (ID, Name, Elevation, Source,
 #'   geometry, Long, Lat)}. \cr\cr
-#'   meteo_lst can be created using \code{\link{load_template}} function using 
+#'   meteo_lst can be created using \code{\link{load_template}} function using
 #'   'xlsx' template file or it could to be created with \code{\link{load_swat_weather}}
 #'   function loading information from SWAT+ model setup weather files.
-#' @param wgn_lst A list of two dataframes: wgn_st - weather generator station 
+#' @param wgn_lst A list of two dataframes: wgn_st - weather generator station
 #' data, wgn_data - weather generator data (prepared by function \code{\link{prepare_wgn}}).
-#' @param fill_missing (optional) Boolean, TRUE - fill data for missing stations with data 
-#' from closest stations with available data. FALSE - leave stations without 
+#' @param fill_missing (optional) Boolean, TRUE - fill data for missing stations with data
+#' from closest stations with available data. FALSE - leave stations without
 #' data. Weather generator will be used to fill missing variables for a model.
 #' Default \code{fill_missing = TRUE}.
 #' @importFrom sf st_transform st_coordinates st_drop_geometry
@@ -1243,17 +1243,17 @@ usersoil_to_sol <- function(csv_path, db_path = NULL){
 #' \dontrun{
 #'   # Getting meteorological data from template
 #'   met_lst <- load_template(temp_path, 3035)
-#'   
+#'
 #'   # Calculating weather generator parameters
 #'   wgn <- prepare_wgn(met_lst)
-#'   
+#'
 #'   # Writing weather input into the model database
 #'   db_path <- "./output/test/project.sqlite"
 #'   add_weather(db_path, met_lst, wgn)
 #' }
 #'
 #' @export
-#' @seealso \code{\link{load_template}}, \code{\link{prepare_wgn}}, 
+#' @seealso \code{\link{load_template}}, \code{\link{prepare_wgn}},
 #' \code{\link{prepare_climate}}
 #' @keywords writing
 
@@ -1261,20 +1261,20 @@ add_weather <- function(db_path, meteo_lst, wgn_lst, fill_missing = TRUE){
   ##Path to the folder to write weather files (same as sql db)
   write_path <- sub("[^/]+$", "", db_path)
   ##Dictionary for parameters
-  p_lst <- list("PCP" = c("pcp", "Precipitation"), 
-                "SLR" = c("slr", "Solar radiation"), 
-                "RELHUM" = c("hmd", "Relative humidity"), 
-                "TMP_MAX" = c("tmp", "Temperature"), 
-                "TMP_MIN" =  c("tmp", "Temperature"), 
-                "WNDSPD" = c("wnd", "Wind speed"), 
-                "WND_DIR" = c("wnd_dir", "Wind direction"),  
+  p_lst <- list("PCP" = c("pcp", "Precipitation"),
+                "SLR" = c("slr", "Solar radiation"),
+                "RELHUM" = c("hmd", "Relative humidity"),
+                "TMP_MAX" = c("tmp", "Temperature"),
+                "TMP_MIN" =  c("tmp", "Temperature"),
+                "WNDSPD" = c("wnd", "Wind speed"),
+                "WND_DIR" = c("wnd_dir", "Wind direction"),
                 "ATMO_DEP" = c("atmo_dep", "Atmospheric deposition"))
   ##Filling data missing at stations with closest station data
   if (fill_missing){
     print("Closest stations are used to fill missing variables.")
     meteo_lst <- fill_with_closest(meteo_lst)
   }
-  ##Converting station coordinates (if not correct already) 
+  ##Converting station coordinates (if not correct already)
   st <-  meteo_lst[["stations"]]
   if (!grepl("4326", st_crs(st)$input)){
     st <- st_transform(st, 4326)
@@ -1285,7 +1285,7 @@ add_weather <- function(db_path, meteo_lst, wgn_lst, fill_missing = TRUE){
   st <- st_drop_geometry(st)
   ##Initiating tables to be filled in loop
   weather_file <- data.frame(id=integer(), filename=character(), type=character(), lat=numeric(), lon=numeric())
-  weather_sta_cli <- data.frame(id=integer(), name=character(), wgn_id=integer(), 
+  weather_sta_cli <- data.frame(id=integer(), name=character(), wgn_id=integer(),
                                 pcp=character(), tmp=character(), slr = character(), hmd = character(),
                                 wnd = character(), wnd_dir = character(), atmo_dep = character(),
                                 lat=numeric(), lon=numeric())
@@ -1295,23 +1295,23 @@ add_weather <- function(db_path, meteo_lst, wgn_lst, fill_missing = TRUE){
   ##Main loop to write weather files and fill 'weather_file' and 'weather_sta_cli' tables
   for (n in sort(names(meteo_lst[["data"]]))){
     ##Initial information to weather file 2 and 3 lines
-    df1 <- data.frame(nbyr = 0, 
-                      tstep = 0, 
-                      lat = round(as.numeric(st[st$ID == n,"Lat"]), 3), 
-                      lon = round(as.numeric(st[st$ID == n,"Long"]), 3), 
+    df1 <- data.frame(nbyr = 0,
+                      tstep = 0,
+                      lat = round(as.numeric(st[st$ID == n,"Lat"]), 3),
+                      lon = round(as.numeric(st[st$ID == n,"Long"]), 3),
                       elev = round(as.numeric(st[st$ID == n,"Elevation"]), 3))
     pars <- names(meteo_lst[["data"]][[n]])
     pars <- pars[pars %in% names(p_lst)[c(1:6)]]
     ##Initial information to 'weather_sta_cli'
-    weather_sta_cli[id_st, c("id", "name", "wgn_id", "lat", "lon")] <- 
+    weather_sta_cli[id_st, c("id", "name", "wgn_id", "lat", "lon")] <-
       list(as.integer(id_st), paste0("s", gsub("\\.", "", as.character(df1$lat)), "n", gsub("\\.", "", as.character(df1$lon)), "e"),
            wgn_lst$wgn_st$ID[wgn_lst$wgn_st$NAME == st$Name[st$ID == n]],
            df1$lat, df1$lon)
     ##Writing and filling data for temperature
     if(all(c("TMP_MAX", "TMP_MIN") %in% pars)){
-      df <- meteo_lst[["data"]][[n]][["TMP_MAX"]] %>% 
-        full_join(meteo_lst[["data"]][[n]][["TMP_MIN"]], by = "DATE") %>% 
-        mutate(year = year(DATE), day = yday(DATE)) %>% 
+      df <- meteo_lst[["data"]][[n]][["TMP_MAX"]] %>%
+        full_join(meteo_lst[["data"]][[n]][["TMP_MIN"]], by = "DATE") %>%
+        mutate(year = year(DATE), day = yday(DATE)) %>%
         select(year, day, TMP_MAX, TMP_MIN, DATE)
       df1$nbyr <- ceiling(interval(df[[1,"DATE"]], df[[nrow(df),"DATE"]]) / years(1))
       file_n <- paste0("sta_", tolower(n), ".", p_lst[["TMP_MAX"]][[1]])
@@ -1333,11 +1333,11 @@ add_weather <- function(db_path, meteo_lst, wgn_lst, fill_missing = TRUE){
       weather_file[id,] <- list(id, file_n, p_lst[["TMP_MAX"]][[1]], as.numeric(df1$lat), as.numeric(df1$lon))
       weather_sta_cli[id_st, "tmp"] <- file_n
       id <- id + 1
-    } 
+    }
     ##Looping for all other parameters (except of temperature)
     for(p in pars){
-      df <- meteo_lst[["data"]][[n]][[p]] %>% 
-        mutate(year = year(DATE), day = yday(DATE)) 
+      df <- meteo_lst[["data"]][[n]][[p]] %>%
+        mutate(year = year(DATE), day = yday(DATE))
       df1$nbyr <- ceiling(interval(df[[1,"DATE"]], df[[nrow(df),"DATE"]]) / years(1))
       file_n <- paste0("sta_", tolower(n), ".", p_lst[[p]][[1]])
       text_l <- paste0(file_n, ": ", p_lst[[p]][[2]], " data - file written by SWATprepR R package ", Sys.time())
@@ -1361,26 +1361,26 @@ add_weather <- function(db_path, meteo_lst, wgn_lst, fill_missing = TRUE){
     id_st <- id_st + 1
   }
   ##Preparing weather generator tables:'weather_wgn_cli', 'weather_wgn_cli_mon'
-  weather_wgn_cli <- wgn_lst$wgn_st %>% 
-    rename(id = ID, name = NAME, lat = LAT, lon = LONG, elev = ELEVATION, rain_yrs = RAIN_YRS) %>% 
+  weather_wgn_cli <- wgn_lst$wgn_st %>%
+    rename(id = ID, name = NAME, lat = LAT, lon = LONG, elev = ELEVATION, rain_yrs = RAIN_YRS) %>%
     mutate(lat = round(as.numeric(lat), 2),
            lon = round(as.numeric(lon), 2),
            elev = round(as.numeric(elev), 1),
            rain_yrs = as.integer(rain_yrs))
-  weather_wgn_cli_mon <- wgn_lst$wgn_data %>% 
+  weather_wgn_cli_mon <- wgn_lst$wgn_data %>%
     rename(weather_wgn_cli_id = wgn_id)
   ##Database part
-  ##Opening database to write 
+  ##Opening database to write
   db <- dbConnect(RSQLite::SQLite(), db_path)
   ##Appending by prepared table (db tables should be empty)
   tryCatch({
     dbWriteTable(db, 'weather_file', weather_file, append = TRUE)
   },
   error = function(e) {
-    stop("Your database could not be updated. This is probably due to that it 
-         already have or had weather data written in before. Please use .sqlite 
-         database in which weather data were not written before. You can also use 
-         prepare_climate() function to update model input text files. In this case 
+    stop("Your database could not be updated. This is probably due to that it
+         already have or had weather data written in before. Please use .sqlite
+         database in which weather data were not written before. You can also use
+         prepare_climate() function to update model input text files. In this case
          .sqlite database will not be updated, but all weather related inputs will
          written in model input text files.")
   })
@@ -1399,7 +1399,7 @@ add_weather <- function(db_path, meteo_lst, wgn_lst, fill_missing = TRUE){
 #' Update SWAT+ project with atmospheric deposition data
 #'
 #' This function updates a SWAT+ model text files and writes the `atmodep.cli`
-#' file for a given dataframe containing atmospheric deposition data. 
+#' file for a given dataframe containing atmospheric deposition data.
 #'
 #' @param df A data frame containing columns "DATE," "NH4_RF," "NO3_RF,"
 #'   "NH4_DRY," and "NO3_DRY" obtained from the \code{\link{get_atmo_dep}}
@@ -1422,7 +1422,7 @@ add_weather <- function(db_path, meteo_lst, wgn_lst, fill_missing = TRUE){
 #' @seealso \code{\link{get_atmo_dep}}
 #' @keywords writing
 #' @author Svajunas Plunge (svajunas.plunge@gmail.com)
-#' @author Moritz Shore (moritzshore@gmail.com) 
+#' @author Moritz Shore (moritzshore@gmail.com)
 
 add_atmo_dep <- function(df, write_path, t_ext = "year") {
   ## Cleaning up the project folder
@@ -1436,7 +1436,7 @@ add_atmo_dep <- function(df, write_path, t_ext = "year") {
   f_path <- paste0(write_path, "/", f_name)
 
   ## initial parameters to write
-  mo_init <- 0 
+  mo_init <- 0
   yr_init <- as.numeric(substr(d[1,1], 1, 4))
   num_aa <- dim(d)[2]
   ##Cases depending on time step
@@ -1459,7 +1459,7 @@ add_atmo_dep <- function(df, write_path, t_ext = "year") {
     stop("Wrong input t_ext should be 'year', 'month' or 'annual'")
   }
   ##Combining all parameters in a dataframe
-  df <- data.frame(NUM_STA = 1, TIMESTEP = ts, MO_INIT = mo_init, 
+  df <- data.frame(NUM_STA = 1, TIMESTEP = ts, MO_INIT = mo_init,
                    YR_INIT = yr_init, NUM_AA = num_aa)
   ##Adding parameter names in the end
   d$par <- rownames(d)
@@ -1472,52 +1472,48 @@ add_atmo_dep <- function(df, write_path, t_ext = "year") {
   ##Updating the weather-sta.cli file
   fname <- "weather-sta.cli"
   f_path <- paste0(write_path, "/", fname)
-  
+
   if(!file.exists(f_path)){
     stop(paste0("File ", fname, " does not exist in the ", write_path, " directory!!!"))
   } else {
     file.copy(f_path, paste0(f_path, ".bak"))
   }
-  
+
   weather_sta_cli <- read_tbl(paste0(fname, ".bak"), write_path)
   weather_sta_cli$atmo_dep <- 'atmodep.cli'
-  st_hd <- c('%-22s', '%12s', rep('%27s', 7))
+  st_hd <- c('%-22s', rep('%27s', ncol(weather_sta_cli) - 1L))
   hd_txt <-  paste0(": written by SWATprepR R package on ", Sys.time(), " for SWAT+ rev.60.5.4")
   ## Writting the file
   write.table(paste0(fname, hd_txt), paste0(write_path, "/", fname), append = FALSE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, quote = FALSE)
   write.table(paste(sprintf(st_hd, names(weather_sta_cli)), collapse = ' '), paste0(write_path, "/", fname), append = TRUE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, quote = FALSE)
   df_to_txt(write_path, fname, weather_sta_cli, st_hd)
-  
+
   print(paste0(fname, " file was successfully updated."))
-  
+
   ##Updating the weather-sta.cli file
   fname <- "codes.bsn"
   f_path <- paste0(write_path, "/", fname)
-  
+
   if(!file.exists(f_path)){
     stop(paste0("File ", fname, " does not exist in the ", write_path, " directory!!!"))
   } else {
     file.copy(f_path, paste0(f_path, ".bak"))
   }
-  
+
   file.copy(f_path, paste0(f_path, ".bak"))
   codes_bsn <- read_tbl(paste0(fname, ".bak"), write_path)
   codes_bsn$atmo_dep <- atmo_dep
-  st_hd <- c(rep('%18s', 2), rep('%10s', 22))
-  
+  st_hd <- rep('%18s', ncol(codes_bsn))
+
   write.table(paste0(fname, hd_txt), paste0(write_path, "/", fname), append = FALSE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, quote = FALSE)
   write.table(paste(sprintf(st_hd, names(codes_bsn)), collapse = ' '), paste0(write_path, "/", fname), append = TRUE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, quote = FALSE)
   df_to_txt(write_path, fname, codes_bsn, st_hd)
   print(paste0(fname, " file was successfully updated."))
-  
-  
+
+
   file_cio <- readLines(paste0(write_path, "/", "file.cio"))
-  ## Updating file.cio file
-  if(!grepl("atmodep.cli", file_cio[4], fixed = TRUE)){
-    substr(file_cio[4], start = 163, stop = 173) <- "atmodep.cli"
-    writeLines(file_cio, paste0(write_path, "/", "file.cio"))
-    print(paste0("file.cio", " file was successfully updated."))
-  } 
+  file_cio <- SWATreadR::swat_cio_set(file_cio, 'climate', 9L, 'atmodep.cli')
+  writeLines(file_cio, file.path(write_path, 'file.cio'))
   return(print(paste("Atmospheric deposition data were written into ", write_path, " directory.")))
 }
 
@@ -1530,13 +1526,13 @@ add_atmo_dep <- function(df, write_path, t_ext = "year") {
 #'
 #' @param df An sf data.frame with land use. The "type" column should be present.
 #' @param year A numeric value representing the year of land use.
-#' @param lookup A dataframe with a "lc1" column for numeric codes and a "type" 
+#' @param lookup A dataframe with a "lc1" column for numeric codes and a "type"
 #'   column for text.
-#' @param lu_constant (optional) A vector of strings with land uses to be kept constant in 
+#' @param lu_constant (optional) A vector of strings with land uses to be kept constant in
 #'   land use (e.g., water, urban areas, etc.). Default \code{lu_constant = c()}.
-#' @param nb_pts (optional) A numeric value representing the number of points per land use/crop 
+#' @param nb_pts (optional) A numeric value representing the number of points per land use/crop
 #'   class. Default \code{nb_pts = 100}.
-#' @param col_name A string with the name of the column to be used representing 
+#' @param col_name A string with the name of the column to be used representing
 #'   the type of crops/land use. Default \code{col_name = "type"}.
 #' @importFrom sf st_as_sf st_join st_transform st_sample
 #' @importFrom dplyr rename mutate left_join select filter sample_n ungroup
@@ -1545,25 +1541,25 @@ add_atmo_dep <- function(df, write_path, t_ext = "year") {
 #' @examples
 #' \dontrun{
 #'   library(sf)
-#'   
+#'
 #'   # Loading land use/crop layer
 #'   lu_path <- system.file("extdata", "GIS/lu_layer.shp", package = "SWATprepR")
 #'   lu <- st_read(lu_path, quiet = TRUE)
-#'   
+#'
 #'   # Preparing lookup table
-#'   lookup <- data.frame(lc1 = seq(1:length(unique(c(lu$type)))), 
+#'   lookup <- data.frame(lc1 = seq(1:length(unique(c(lu$type)))),
 #'                        type = unique(c(lu$type)))
-#'                        
+#'
 #'   # Setting land uses to be kept constant
-#'   lu_constant <- c("fesc", "orch", "frst", "frse", "frsd", "urld", "urhd", 
+#'   lu_constant <- c("fesc", "orch", "frst", "frse", "frsd", "urld", "urhd",
 #'                    "wetl", "past", "watr", "agrl")
-#'   
+#'
 #'   # Getting training points
 #'   pts <- get_lu_points(lu, 2021, lookup, lu_constant)
 #' }
 #' @references
-#' Mészáros, J., & Szabó, B. (2022). Script to derive and apply crop 
-#' classification based on Sentinel 1 satellite radar images in Google Earth 
+#' Mészáros, J., & Szabó, B. (2022). Script to derive and apply crop
+#' classification based on Sentinel 1 satellite radar images in Google Earth
 #' Engine platform. \url{https://doi.org/10.5281/zenodo.6700122}
 #' @keywords remote-sensing
 
@@ -1572,7 +1568,7 @@ get_lu_points <- function(df, year, lookup, lu_constant = c(),  nb_pts = 100, co
     rename(type = 1) %>%
     mutate(year = year) %>%
     left_join(lookup, by = "type") %>%
-    select(lc1, year) %>% 
+    select(lc1, year) %>%
     filter(lc1 %in% c(lookup[!lookup$type %in% lu_constant,"lc1"]))
   pts <- st_as_sf(st_sample(df, length(c(lookup[!lookup$type %in% lu_constant,"lc1"]))*2*nb_pts))
   pts <- st_join(pts, left = FALSE, df[c("lc1","year")]) %>%
@@ -1586,18 +1582,18 @@ get_lu_points <- function(df, year, lookup, lu_constant = c(),  nb_pts = 100, co
 
 #' Extract rotation information from raster file
 #'
-#' This function extracts crop rotation information from a raster file and 
-#' amends the land use data accordingly. 
-#' This function requires `raster` package to be installed. 
+#' This function extracts crop rotation information from a raster file and
+#' amends the land use data accordingly.
+#' This function requires `raster` package to be installed.
 #'
-#' @param df An sf data.frame with land use. Columns "id" and "type" should be 
-#' present. 
+#' @param df An sf data.frame with land use. Columns "id" and "type" should be
+#' present.
 #' @param start_year A numeric value representing the year from which data begins.
 #' @param tif_name A string for the name of the .tif raster file.
 #' @param r_path A string for the path to the .tif file.
-#' @param lookup A dataframe with a "lc1" column for numeric codes and a "type" 
+#' @param lookup A dataframe with a "lc1" column for numeric codes and a "type"
 #' column for text.
-#' @param lu_constant (optional) A vector of strings with land uses to be kept constant in 
+#' @param lu_constant (optional) A vector of strings with land uses to be kept constant in
 #' land use (e.g., water, urban areas). Default \code{lu_constant = c()}.
 
 #' @importFrom dplyr left_join mutate_at all_of mutate select vars starts_with
@@ -1607,38 +1603,38 @@ get_lu_points <- function(df, year, lookup, lu_constant = c(),  nb_pts = 100, co
 #' @examples
 #' \dontrun{
 #'   library(sf)
-#'   
+#'
 #'   # Loading land use/crop layer
 #'   lu_path <- system.file("extdata", "GIS/lu_layer.shp", package = "SWATprepR")
 #'   lu <- st_read(lu_path, quiet = TRUE) %>% mutate(id = row_number())
-#'   
+#'
 #'   # Preparing lookup table
-#'   lookup <- data.frame(lc1 = seq(1:length(unique(c(lu$type)))), 
+#'   lookup <- data.frame(lc1 = seq(1:length(unique(c(lu$type)))),
 #'   type = unique(c(lu$type)))
-#'   lu_constant <- c("fesc", "orch", "frst", "frse", "frsd", "urld", "urhd", 
+#'   lu_constant <- c("fesc", "orch", "frst", "frse", "frsd", "urld", "urhd",
 #'   "wetl", "past", "watr", "agrl")
-#' 
+#'
 #'   # Extracting rotation information from raster
-#'   # Raster information should have been prepared with remote sensing 
-#'   lu_rot <- extract_rotation(lu, 2015, "cropmaps.tif", "./output/", lookup, 
+#'   # Raster information should have been prepared with remote sensing
+#'   lu_rot <- extract_rotation(lu, 2015, "cropmaps.tif", "./output/", lookup,
 #'   lu_constant)
 #' }
-#' @references 
-#' Meszaros, J., & Szabo, B. (2022). Script to derive and apply crop 
-#' classification based on Sentinel 1 satellite radar images in Google Earth 
+#' @references
+#' Meszaros, J., & Szabo, B. (2022). Script to derive and apply crop
+#' classification based on Sentinel 1 satellite radar images in Google Earth
 #' Engine platform. \url{https://doi.org/10.5281/zenodo.6700122}
 #' @keywords remote-sensing
 
 extract_rotation <- function(df, start_year, tif_name, r_path, lookup, lu_constant = c()){
-  ##Check in raster library is installed 
+  ##Check in raster library is installed
   if(!requireNamespace("raster", quietly = TRUE)){
     stop("This function requires 'raster' package to be installed.")
   }
   r <- raster::raster(paste0(r_path, tif_name), band = 1)
   bn <- raster::nbands(r)
   ##Centroids for each field in land use data created
-  suppressWarnings(centroid <- df["id"] %>% 
-                     st_point_on_surface() %>% 
+  suppressWarnings(centroid <- df["id"] %>%
+                     st_point_on_surface() %>%
                      st_transform(st_crs(r)))
   c <- c()
   for (i in seq(1:bn)){
@@ -1651,12 +1647,12 @@ extract_rotation <- function(df, start_year, tif_name, r_path, lookup, lu_consta
     c <- c(c, n)
   }
   ##Preparing GIS field layer with rotations in attributes
-  lu_rot <- df[c("id", "type")] %>% 
-    left_join(st_drop_geometry(centroid), by = "id") %>% 
-    mutate_at(vars(all_of(c)), ~lookup$type[match(., lookup$lc1)]) %>% 
-    mutate(lu = ifelse(type %in% lu_constant, type, paste0("field_", id))) %>% 
+  lu_rot <- df[c("id", "type")] %>%
+    left_join(st_drop_geometry(centroid), by = "id") %>%
+    mutate_at(vars(all_of(c)), ~lookup$type[match(., lookup$lc1)]) %>%
+    mutate(lu = ifelse(type %in% lu_constant, type, paste0("field_", id))) %>%
     dplyr::select(lu, type, starts_with("y_"), geometry)
-  
+
   ##Removing rotations for constant land uses/crops
   lu_rot[!startsWith(lu_rot$lu, "field_"), c] <- NA
   print("Extraction finished succesfully")
@@ -1667,27 +1663,27 @@ extract_rotation <- function(df, start_year, tif_name, r_path, lookup, lu_consta
 
 #' Prepare Point Source Data Model Text Files
 #'
-#' This function prepares text files for a SWAT+ model to represent point source 
+#' This function prepares text files for a SWAT+ model to represent point source
 #' data. It is designed for simple cases with yearly values,
 #' where point sources discharge to a single channel.
 #'
-#' @param pt_lst Nested list with dataframes. 
-#'   Nested structure: \code{pt_lst -> data -> Dataframe (name, DATE, flo, ...)}, 
+#' @param pt_lst Nested list with dataframes.
+#'   Nested structure: \code{pt_lst -> data -> Dataframe (name, DATE, flo, ...)},
 #'   \code{pt_lst -> st -> Dataframe (name, Lat, Long)}.
-#'   Additional information on the input variables, which could be used in the template 
+#'   Additional information on the input variables, which could be used in the template
 #'   files can be found in the SWAT+ documentation: ['filename'.rec](https://swatplus.gitbook.io/io-docs/introduction/point-sources-and-inlets/filename.rec)
-#'   Point source data can be loaded with \code{\link{load_template}} function 
-#'   using 'xlsx' template file. 
-#' @param project_path Character, path to the SWAT+ project folder (example "my_model"). 
-#' @param constant (optional) Logical, if TRUE, point source data will be constant in model. 
-#' Default \code{constant = FALSE}. 
-#' @param write_path (optional) Character, path to SWAT+ txtinout folder (example "my_model"). 
+#'   Point source data can be loaded with \code{\link{load_template}} function
+#'   using 'xlsx' template file.
+#' @param project_path Character, path to the SWAT+ project folder (example "my_model").
+#' @param constant (optional) Logical, if TRUE, point source data will be constant in model.
+#' Default \code{constant = FALSE}.
+#' @param write_path (optional) Character, path to SWAT+ txtinout folder (example "my_model").
 #'   Default \code{write_path = NULL}, which is the same as \code{project_path}.
-#' @param cha_shape_path (optional) Character, path to SWAT+ channel shapefile. 
-#'   'id' column should be present in attributes with numeric values representing channel ids 
-#'   corresponding to ids in 'chandeg.con' file. Default \code{cha_shape_path = FALSE}, 
-#'   which assigns point sources to nearest center point in 'chandeg.con'. 
-#'   To activate this parameter provide path to reach file, example \code{cha_shape_path = "my_path/my_channel_shape.shp"}, 
+#' @param cha_shape_path (optional) Character, path to SWAT+ channel shapefile.
+#'   'id' column should be present in attributes with numeric values representing channel ids
+#'   corresponding to ids in 'chandeg.con' file. Default \code{cha_shape_path = FALSE},
+#'   which assigns point sources to nearest center point in 'chandeg.con'.
+#'   To activate this parameter provide path to reach file, example \code{cha_shape_path = "my_path/my_channel_shape.shp"},
 #'   point sources will be assigned to nearest channel line.
 #' @importFrom sf st_as_sf st_nearest_feature st_crs st_drop_geometry st_transform read_sf
 #' @importFrom lubridate year
@@ -1715,7 +1711,7 @@ prepare_ps <- function(pt_lst, project_path, constant = FALSE, write_path = NULL
   id <- 0
   for(i in unique(pt_lst$data$ob_name)){
     ri <- pt_lst$data[pt_lst$data$ob_name == i,]
-    # if constant, then time steps do not 
+    # if constant, then time steps do not
     if(!constant){
       t <- find_time_step(ri[2, "DATE"], ri[1, "DATE"])
       ri$ob_typ <- paste0(ri$ob_typ, "_", t$typ)
@@ -1732,12 +1728,12 @@ prepare_ps <- function(pt_lst, project_path, constant = FALSE, write_path = NULL
         summarise(across(everything(), sum), .groups = "drop_last") %>%
         select(-yr) %>%
         summarise(across(everything(), mean), .groups = "drop") %>%
-        rename(name = ob_name) 
+        rename(name = ob_name)
       s <- c('%-17s', rep('%14s', 18))
       if(id == 0){
-        write.table(paste0(fname, text_l), f_path, append = FALSE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, 
+        write.table(paste0(fname, text_l), f_path, append = FALSE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE,
                     quote = FALSE)
-        write.table(paste(sprintf(s, names(ri)), collapse = ' '), f_path, append = TRUE, sep = "\t", dec = ".", row.names = FALSE, 
+        write.table(paste(sprintf(s, names(ri)), collapse = ' '), f_path, append = TRUE, sep = "\t", dec = ".", row.names = FALSE,
                     col.names = FALSE, quote = FALSE)
         df_to_txt(write_path, fname, ri, s)
       } else{
@@ -1750,73 +1746,73 @@ prepare_ps <- function(pt_lst, project_path, constant = FALSE, write_path = NULL
       f_rec_path <- paste0(write_path, "/", "recall.rec")
       f_con_path <- paste0(write_path, "/", "recall.con")
       s <- c(rep('%8s', 2), rep('%9s', 3), rep('%10s', 19))
-      write.table(paste0(fname, text_l), f_path, append = FALSE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, 
+      write.table(paste0(fname, text_l), f_path, append = FALSE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE,
                   quote = FALSE)
       write.table(dim(ri)[1], f_path, append = TRUE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, quote = FALSE)
-      write.table(paste(sprintf(s, names(ri)), collapse = ' '), f_path, append = TRUE, sep = "\t", dec = ".", row.names = FALSE, 
+      write.table(paste(sprintf(s, names(ri)), collapse = ' '), f_path, append = TRUE, sep = "\t", dec = ".", row.names = FALSE,
                   col.names = FALSE, quote = FALSE)
       df_to_txt(write_path, fname, ri, s)
       print(paste0(fname, " file was successfully written."))
     }
-    
-    
+
+
     if(id == 0){
       if(constant){
-        write.table(paste0("exco.exc", text_l), f_rec_path, append = FALSE, sep = "\t", dec = ".", row.names = FALSE, 
+        write.table(paste0("exco.exc", text_l), f_rec_path, append = FALSE, sep = "\t", dec = ".", row.names = FALSE,
                     col.names = FALSE, quote = FALSE)
-        write.table(paste(sprintf(c('%-23s', rep('%15s', 5)), c("name", "om", "pest", "path", "hmet", "salt")), collapse = ' '), f_rec_path, 
+        write.table(paste(sprintf(c('%-23s', rep('%15s', 5)), c("name", "om", "pest", "path", "hmet", "salt")), collapse = ' '), f_rec_path,
                     append = TRUE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, quote = FALSE)
-        
-        write.table(paste0("exco.con", text_l), f_con_path, append = FALSE, sep = "\t", dec = ".", row.names = FALSE, 
+
+        write.table(paste0("exco.con", text_l), f_con_path, append = FALSE, sep = "\t", dec = ".", row.names = FALSE,
                     col.names = FALSE, quote = FALSE)
-        write.table(paste(sprintf(c(rep('%10s', 17)), c('id', 'name', 'gis_id', 'area', 'lat', 'lon', 'elev', 'exco', 'wst', 'cst', 
-                                                        'ovfl', 'rule', 'out_tot', 'obj_typ', 'obj_id', 'hyd_typ', 'frac')), 
-                          collapse = ' '), f_con_path, append = TRUE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, 
+        write.table(paste(sprintf(c(rep('%10s', 17)), c('id', 'name', 'gis_id', 'area', 'lat', 'lon', 'elev', 'exco', 'wst', 'cst',
+                                                        'ovfl', 'rule', 'out_tot', 'obj_typ', 'obj_id', 'hyd_typ', 'frac')),
+                          collapse = ' '), f_con_path, append = TRUE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE,
                     quote = FALSE)
       } else {
-        write.table(paste0("recall.rec", text_l), f_rec_path, append = FALSE, sep = "\t", dec = ".", row.names = FALSE, 
+        write.table(paste0("recall.rec", text_l), f_rec_path, append = FALSE, sep = "\t", dec = ".", row.names = FALSE,
                     col.names = FALSE, quote = FALSE)
-        write.table(paste(sprintf(c(rep('%10s', 4)), c("id", "name", "rec_typ", "file")), collapse = ' '), f_rec_path, 
+        write.table(paste(sprintf(c(rep('%10s', 4)), c("id", "name", "rec_typ", "file")), collapse = ' '), f_rec_path,
                     append = TRUE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, quote = FALSE)
-        write.table(paste0("recall.con", text_l), f_con_path, append = FALSE, sep = "\t", dec = ".", row.names = FALSE, 
+        write.table(paste0("recall.con", text_l), f_con_path, append = FALSE, sep = "\t", dec = ".", row.names = FALSE,
                     col.names = FALSE, quote = FALSE)
-        write.table(paste(sprintf(c(rep('%10s', 17)), c('id', 'name', 'gis_id', 'area', 'lat', 'lon', 'elev', 'rec', 'wst', 'cst', 
-                                                        'ovfl', 'rule', 'out_tot', 'obj_typ', 'obj_id', 'hyd_typ', 'frac')), 
-                          collapse = ' '), f_con_path, append = TRUE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, 
+        write.table(paste(sprintf(c(rep('%10s', 17)), c('id', 'name', 'gis_id', 'area', 'lat', 'lon', 'elev', 'rec', 'wst', 'cst',
+                                                        'ovfl', 'rule', 'out_tot', 'obj_typ', 'obj_id', 'hyd_typ', 'frac')),
+                          collapse = ' '), f_con_path, append = TRUE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE,
                     quote = FALSE)
       }
-      
-      cha_table <- read_tbl("chandeg.con", project_path) 
+
+      cha_table <- read_tbl("chandeg.con", project_path)
       if(!is.character(cha_shape_path)){
         warning("No channel shapefile provided. Channel IDs will be assigned based on nearest center point in 'chandeg.con'.")
-        cha_table <- cha_table %>% 
-          st_as_sf(coords = c("lon", "lat"), crs = st_crs(pt_lst$st)$input) %>% 
-          .[st_nearest_feature(pt_lst$st, .),] %>% 
+        cha_table <- cha_table %>%
+          st_as_sf(coords = c("lon", "lat"), crs = st_crs(pt_lst$st)$input) %>%
+          .[st_nearest_feature(pt_lst$st, .),] %>%
           st_drop_geometry
       } else {
-        cha <- read_sf(cha_shape_path) %>% 
-          st_transform(4326) %>% 
-          .[st_nearest_feature(pt_lst$st, .),] %>% 
-          st_drop_geometry %>% 
-          select(id) %>% 
+        cha <- read_sf(cha_shape_path) %>%
+          st_transform(4326) %>%
+          .[st_nearest_feature(pt_lst$st, .),] %>%
+          st_drop_geometry %>%
+          select(id) %>%
           left_join(cha_table, by = "id")
       }
-    } 
+    }
     id <- id + 1
     if(constant){
-      write.table(paste(sprintf(c('%-23s', rep('%15s', 5)), c(rep(ri$name, 2), rep("null", 4))), collapse = ' '), f_rec_path, append = TRUE, 
+      write.table(paste(sprintf(c('%-23s', rep('%15s', 5)), c(rep(ri$name, 2), rep("null", 4))), collapse = ' '), f_rec_path, append = TRUE,
                   sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, quote = FALSE)
     } else {
-      write.table(paste(sprintf(c(rep('%10s', 4)), c(id, i, t$rec_typ, fname)), collapse = ' '), f_rec_path, append = TRUE, 
+      write.table(paste(sprintf(c(rep('%10s', 4)), c(id, i, t$rec_typ, fname)), collapse = ' '), f_rec_path, append = TRUE,
                   sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, quote = FALSE)
     }
-    write.table(paste(sprintf(c(rep('%10s', 17)), c(id, i, cha_table[id, "gis_id"][[1]], "0.00001", pt_lst$st[pt_lst$st$name == i, "Lat"][[1]], 
-                                                    pt_lst$st[pt_lst$st$name == i, "Long"][[1]], cha_table[id, "elev"][[1]], id, 
+    write.table(paste(sprintf(c(rep('%10s', 17)), c(id, i, cha_table[id, "gis_id"][[1]], "0.00001", pt_lst$st[pt_lst$st$name == i, "Lat"][[1]],
+                                                    pt_lst$st[pt_lst$st$name == i, "Long"][[1]], cha_table[id, "elev"][[1]], id,
                                                     "null", cha_table[id, "cst"][[1]], cha_table[id, "ovfl"][[1]],
-                                                    cha_table[id, "rule"][[1]], 1, "sdc", 
-                                                    cha_table[id, "id"][[1]], "tot", 1)), 
+                                                    cha_table[id, "rule"][[1]], 1, "sdc",
+                                                    cha_table[id, "id"][[1]], "tot", 1)),
                       collapse = ' '), f_con_path, append = TRUE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, quote = FALSE)
-    
+
   }
   if(constant){
     print(paste0("exco.exc", " file was successfully written."))
@@ -1825,7 +1821,7 @@ prepare_ps <- function(pt_lst, project_path, constant = FALSE, write_path = NULL
     print(paste0("recall.rec", " file was successfully written."))
     print(paste0("recall.con", " file was successfully written."))
   }
-  
+
   ## Updating object.cnt file
   f_obj_path <- paste0(write_path, "/", "object.cnt")
   ## Just to have object.cnt file unlocked during writing
@@ -1833,47 +1829,32 @@ prepare_ps <- function(pt_lst, project_path, constant = FALSE, write_path = NULL
     file.copy(from = paste0(f_obj_path),
               to = paste0(f_obj_path, ".bak"), overwrite = TRUE)
   }
-  object.cnt <- read_tbl("object.cnt.bak", project_path)  
+  object.cnt <- read_tbl("object.cnt", write_path)
   if(constant){
     object.cnt$exco <- id
   } else {
     object.cnt$rec <- id
   }
   object.cnt$obj <- sum(object.cnt[c(5:ncol(object.cnt))])
-  write.table(paste0("object.cnt", text_l), f_obj_path, append = FALSE, sep = "\t", dec = ".", row.names = FALSE, 
+  write.table(paste0("object.cnt", text_l), f_obj_path, append = FALSE, sep = "\t", dec = ".", row.names = FALSE,
               col.names = FALSE, quote = FALSE)
-  write.table(paste(sprintf(c('%-20s', rep('%11s', 6), rep('%9s', 14)), names(object.cnt)), collapse = ' '), f_obj_path, append = TRUE, 
+  write.table(paste(sprintf(c('%-20s', rep('%11s', ncol(object.cnt) - 1L)), names(object.cnt)), collapse = ' '), f_obj_path, append = TRUE,
               sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, quote = FALSE)
-  write.table(paste(sprintf(c('%-20s', rep('%11s', 6), rep('%9s', 14)), object.cnt[1,]), 
+  write.table(paste(sprintf(c('%-20s', rep('%11s', ncol(object.cnt) - 1L)), object.cnt[1,]),
                     collapse = ' '), f_obj_path, append = TRUE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, quote = FALSE)
   print(paste0("object.cnt", " file was successfully updated."))
-  
-  ## Updating file.cio file
-  file_cio <- readLines(paste0(project_path, "/", "file.cio"))
-  cio_update_needed <- FALSE
-  if(constant){
-    if(!grepl("exco.exc", file_cio[10], fixed = TRUE)){
-      file_cio[10] <- "exco              exco.exc          exco_om.exc       null              null              null              null  "
-      cio_update_needed <- TRUE
-    }
-    if(!grepl("exco.con", file_cio[5], fixed = TRUE)){
-      substr(file_cio[5], start = 181, stop = 188) <- "exco.con"
-      cio_update_needed <- TRUE
-    }
+
+  ## Update only the point-source entries, retaining other revision-specific fields.
+  cio_path <- file.path(write_path, 'file.cio')
+  file_cio <- readLines(cio_path)
+  if (constant) {
+    file_cio <- SWATreadR::swat_cio_set(file_cio, 'exco', 1:2, c('exco.exc', 'exco_om.exc'))
+    file_cio <- SWATreadR::swat_cio_set(file_cio, 'connect', 10L, 'exco.con')
   } else {
-    if(!grepl("recall.rec", file_cio[11], fixed = TRUE)){
-      file_cio[11] <- "recall            recall.rec        "
-      cio_update_needed <- TRUE
-    }
-    if(!grepl("recall.con", file_cio[5], fixed = TRUE)){
-      substr(file_cio[5], start = 163, stop = 172) <- "recall.con"
-      cio_update_needed <- TRUE
-    }
+    file_cio <- SWATreadR::swat_cio_set(file_cio, 'recall', 1L, 'recall.rec')
+    file_cio <- SWATreadR::swat_cio_set(file_cio, 'connect', 9L, 'recall.con')
   }
-  if(cio_update_needed){
-    writeLines(file_cio, paste0(project_path, "/", "file.cio"))
-    print(paste0("file.cio", " file was successfully updated."))
-  }
+  writeLines(file_cio, cio_path)
   print(paste0("Point source files for model have been successfully prepared and written in ", write_path, " folder."))
 }
 
