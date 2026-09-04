@@ -5,17 +5,17 @@ These version tags expose the source before the SWAT+ 62 update and the tested u
 | Snapshot | Package version | Git tag |
 | --- | --- | --- |
 | Old source baseline | 1.0.13 | [before-swat62-update](https://github.com/MR-Eini/SWATprepR-swat62/tree/before-swat62-update) |
-| Updated development version | 1.0.15 | [swat62-v1.0.15](https://github.com/MR-Eini/SWATprepR-swat62/tree/swat62-v1.0.15) |
+| Updated development version | 1.0.16 | [swat62-v1.0.16](https://github.com/MR-Eini/SWATprepR-swat62/tree/swat62-v1.0.16) |
 
 The old tag points to commit [`5b25cd682226de1b9a989cd4c7dc2fec5ab343dd`](https://github.com/MR-Eini/SWATprepR-swat62/commit/5b25cd682226de1b9a989cd4c7dc2fec5ab343dd), the exact upstream source commit used before these edits. It is a source baseline for this update, not a claim that every bundled package dates from three years ago.
 
 ## Review the differences on GitHub
 
-1. Open the [old-to-updated comparison](https://github.com/MR-Eini/SWATprepR-swat62/compare/before-swat62-update...swat62-v1.0.15?w=1).
+1. Open the [old-to-updated comparison](https://github.com/MR-Eini/SWATprepR-swat62/compare/before-swat62-update...swat62-v1.0.16?w=1).
 2. Scroll to the changed files. GitHub marks removed lines red and added lines green.
 3. Open individual files or commits to inspect each change. Where available, select the split view to see old and new code side by side.
 
-The comparison above hides whitespace-only changes, which is especially useful for files with different Windows line endings. The [complete comparison](https://github.com/MR-Eini/SWATprepR-swat62/compare/before-swat62-update...swat62-v1.0.15) includes every change. The [commit history](https://github.com/MR-Eini/SWATprepR-swat62/commits/main) shows the incremental updates.
+The comparison above hides whitespace-only changes, which is especially useful for files with different Windows line endings. The [complete comparison](https://github.com/MR-Eini/SWATprepR-swat62/compare/before-swat62-update...swat62-v1.0.16) includes every change. The [commit history](https://github.com/MR-Eini/SWATprepR-swat62/commits/main) shows the incremental updates.
 
 Both tags are fixed snapshots. Future versions should receive new version tags; `main` remains the current working branch. These are maintained development versions, not releases issued by the original authors.
 
@@ -24,6 +24,7 @@ Both tags are fixed snapshots. Future versions should receive new version tags; 
 - Close Windows input handles before rewriting files and retain new table fields.
 - Update atmospheric-deposition and point-source file.cio entries by section name.
 - Require an explicit local or OPeNDAP NetCDF source for each EMEP year instead of embedding a reporting-cycle URL; validate catchment-specific deposition inputs.
+- Add a tested resolver for the official EMEP 2025 Reporting dataset and correct the documented oxidized dry-deposition variable name.
 - Write revision-aware weather, codes, and object-count tables without fixed column totals.
 
 ## Tested scope

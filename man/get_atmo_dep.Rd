@@ -51,11 +51,9 @@ a specified catchment.
   # Specify the path to the basin boundary shape file
   catchment_boundary_path <- system.file("extdata", "GIS/basin.shp", package = "SWATprepR")
   
-  # Resolve one current EMEP file for every requested year
-  source <- function(year, timestep) {
-    sprintf("https://example.org/EMEP_%s_%d.nc", timestep, year)
-  }
-  df <- get_atmo_dep(catchment_boundary_path, netcdf_source = source)
+  # Resolve files in the official EMEP 2025 Reporting dataset
+  df <- get_atmo_dep(catchment_boundary_path,
+                     netcdf_source = emep_2025_netcdf_source)
   
   # Plot results
   ggplot(pivot_longer(df, !DATE, names_to = "par", values_to = "values"), 

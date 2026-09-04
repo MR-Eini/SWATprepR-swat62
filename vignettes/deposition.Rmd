@@ -18,7 +18,7 @@ According to @grizzetti2005 study done in three catchments in Europe atmospheric
 
 Nitrogen atmospheric could be obtained from local sources. However, if local data in not available or not all parameters available, deposition data can be extracted from European Monitoring and Evaluation Programme (EMEP) provided [MSC-W model data files](https://www.emep.int/mscw/mscw_moddata.html). The EMEP portal provides gridded 0.1$^{\circ}$ resolution *netCDF* data over Europe. MSC-W model [grid covers territory](https://www.emep.int/grid/lonlatgrid.pdf) between -30 to 90 longitude and  30 to 82 latitude with 50x50 km^2^ grid cell. The parameters, which are needed for SWAT+ model are: 
 
-- *DDEP_OXN_m2GridDry* - deposition of oxidized nitrogen per m2 grid ($mgN/m^2$);
+- *DDEP_OXN_m2Grid* - deposition of oxidized nitrogen per m2 grid ($mgN/m^2$);
 - *WDEP_OXN* - wet deposition of oxidized nitrogen ($mgN/m^2$); 
 - *DDEP_RDN_m2Grid* - dry deposition of reduced nitrogen per m2 grid ($mgN/m^2$); 
 - *WDEP_RDN* - wet deposition of reduced nitrogen ($mgN/m^2$).
@@ -37,17 +37,14 @@ These parameters can be used to prepare following SWAT+ parameters required for 
 - *NH4_DRY* - ammonia nitrogen dry deposition ($kg/ha/yr$);
 - *NO3_DRY* - nitrate nitrogen dry deposition ($kg/ha/yr$). 
 
-EMEP provides yearly, monthly, daily and hourly data. Reporting-cycle directories and file names change, so [get_atmo_dep](../reference/get_atmo_dep.html) requires an explicit local or OPeNDAP NetCDF source for each year. Obtain the current sources from the [EMEP model-data page](https://www.emep.int/mscw/mscw_moddata.html). Depending on the selected time step, extraction can take some time. More information about atmospheric deposition in SWAT+ is presented in section 3.10 of the [SWAT+ modelling protocol](https://doi.org/10.5281/zenodo.7463395).
+EMEP provides yearly, monthly, daily and hourly data. Reporting-cycle directories and file names change, so [get_atmo_dep](../reference/get_atmo_dep.html) accepts an explicit local or OPeNDAP NetCDF source for each year. `emep_2025_netcdf_source()` resolves the official 2025 Reporting dataset for 1990 through 2024. Obtain later reporting cycles from the [EMEP model-data page](https://www.emep.int/mscw/mscw_moddata.html). Depending on the selected time step, extraction can take some time. More information about atmospheric deposition in SWAT+ is presented in section 3.10 of the [SWAT+ modelling protocol](https://doi.org/10.5281/zenodo.7463395).
 
 ```{r atmo_dep, eval=FALSE, message = FALSE, warning = FALSE}
 library(SWATprepR)
 library(tidyverse)
 basin_path <- system.file("extdata", "GIS/basin.shp", package = "SWATprepR")
-netcdf_source <- function(year, timestep) {
-  file.path('path/to/emep', sprintf('EMEP_%s_%d.nc', timestep, year))
-}
 df <- get_atmo_dep(basin_path, t_ext = 'month',
-                   netcdf_source = netcdf_source)
+                   netcdf_source = emep_2025_netcdf_source)
 ##Plot results
 ggplot(pivot_longer(df, !DATE, names_to = "par", values_to = "values"), aes(x = DATE, y = values))+ 
   geom_line()+ 

@@ -509,10 +509,8 @@ load_swat_weather <- function(input_folder){
 #'   catchment_boundary_path <- system.file("extdata", "GIS/basin.shp", package = "SWATprepR")
 #'   
 #'   # Get atmospheric deposition data for the catchment
-#'   source <- function(year, timestep) {
-#'     sprintf("https://example.org/EMEP_%s_%d.nc", timestep, year)
-#'   }
-#'   df <- get_atmo_dep(catchment_boundary_path, netcdf_source = source)
+#'   df <- get_atmo_dep(catchment_boundary_path,
+#'                      netcdf_source = emep_2025_netcdf_source)
 #'   
 #'   # Plot results
 #'   ggplot(pivot_longer(df, !DATE, names_to = "par", values_to = "values"), 
@@ -526,6 +524,37 @@ load_swat_weather <- function(input_folder){
 #' @keywords loading
 #' @seealso 
 #' Please read about SWAT+ atmospheric input data on \url{https://swatplus.gitbook.io/io-docs/introduction/climate/atmo.cli}.
+
+#' Resolve files in the official EMEP 2025 Reporting dataset
+#'
+#' Returns the OPeNDAP URL for one meteorological year in the EMEP MSC-W
+#' 2025 Reporting dataset (model revision 5.6). The catalog contains data for
+#' 1990 through 2024. The 2024 meteorology file uses 2023 emissions, matching
+#' the filename published by EMEP.
+#'
+#' @param year One integer year from 1990 through 2024.
+#' @param timestep Either `"year"` or `"month"`.
+#' @return A character OPeNDAP URL suitable for `get_atmo_dep(netcdf_source=)`.
+#' @references EMEP MSC-W model data: \url{https://www.emep.int/mscw/mscw_moddata.html}
+#' @export
+emep_2025_netcdf_source <- function(year, timestep) {
+  if (!is.numeric(year) || length(year) != 1L || is.na(year) ||
+      !is.finite(year) || year %% 1 != 0 || year < 1990 || year > 2024) {
+    stop("EMEP 2025 Reporting contains integer years from 1990 through 2024.")
+  }
+  if (!is.character(timestep) || length(timestep) != 1L || is.na(timestep) ||
+      !timestep %in% c("year", "month")) {
+    stop("'timestep' must be 'year' or 'month'.")
+  }
+  year <- as.integer(year)
+  emissions_year <- if (year == 2024L) 2023L else year
+  suffix <- if (year <= 2022L) "_rep2025.nc" else ".nc"
+  sprintf(
+    paste0("https://thredds.met.no/thredds/dodsC/data/EMEP/2025_Reporting/",
+           "EMEP01_rv5.6_%s.%dmet_%demis%s"),
+    timestep, year, emissions_year, suffix
+  )
+}
 
 resolve_atmo_dep_sources <- function(netcdf_source, years, timestep) {
   if (is.null(netcdf_source)) {

@@ -4,9 +4,9 @@
 | Source snapshot | Package version | Browse code |
 | --- | --- | --- |
 | Before this update | 1.0.13 | [Old source](https://github.com/MR-Eini/SWATprepR-swat62/tree/before-swat62-update) |
-| Tested SWAT+ 62 update | 1.0.15 | [Updated source](https://github.com/MR-Eini/SWATprepR-swat62/tree/swat62-v1.0.15) |
+| Tested SWAT+ 62 update | 1.0.16 | [Updated source](https://github.com/MR-Eini/SWATprepR-swat62/tree/swat62-v1.0.16) |
 
-**[Compare old and updated code](https://github.com/MR-Eini/SWATprepR-swat62/compare/before-swat62-update...swat62-v1.0.15?w=1)** - GitHub highlights removed lines in red and added lines in green. Whitespace-only differences are hidden in this link; [show the complete diff](https://github.com/MR-Eini/SWATprepR-swat62/compare/before-swat62-update...swat62-v1.0.15) if needed.
+**[Compare old and updated code](https://github.com/MR-Eini/SWATprepR-swat62/compare/before-swat62-update...swat62-v1.0.16?w=1)** - GitHub highlights removed lines in red and added lines in green. Whitespace-only differences are hidden in this link; [show the complete diff](https://github.com/MR-Eini/SWATprepR-swat62/compare/before-swat62-update...swat62-v1.0.16) if needed.
 
 [Version history and change summary](VERSION-HISTORY.md) explains the baseline and tested scope. Original author attribution and upstream Git history are preserved.
 <!-- /swat62-version-navigation -->

@@ -19,6 +19,23 @@ test_that('atmospheric deposition sources are explicit and year-specific', {
     c('month 2004', 'month 2005'))
 })
 
+test_that('official EMEP 2025 Reporting URLs match the published catalog', {
+  expect_identical(
+    emep_2025_netcdf_source(2004, 'year'),
+    paste0('https://thredds.met.no/thredds/dodsC/data/EMEP/2025_Reporting/',
+           'EMEP01_rv5.6_year.2004met_2004emis_rep2025.nc'))
+  expect_identical(
+    emep_2025_netcdf_source(2023, 'month'),
+    paste0('https://thredds.met.no/thredds/dodsC/data/EMEP/2025_Reporting/',
+           'EMEP01_rv5.6_month.2023met_2023emis.nc'))
+  expect_identical(
+    emep_2025_netcdf_source(2024, 'year'),
+    paste0('https://thredds.met.no/thredds/dodsC/data/EMEP/2025_Reporting/',
+           'EMEP01_rv5.6_year.2024met_2023emis.nc'))
+  expect_error(emep_2025_netcdf_source(2025, 'year'), '1990 through 2024')
+  expect_error(emep_2025_netcdf_source(2023, 'day'), "'year' or 'month'")
+})
+
 test_that('atmospheric deposition inputs are validated', {
   validate <- getFromNamespace('validate_atmo_dep_data', 'SWATprepR')
   valid <- data.frame(DATE = c('2005-01-01', '2004-01-01'), NH4_RF = c(1, 2),
